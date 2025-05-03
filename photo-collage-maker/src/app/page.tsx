@@ -1,22 +1,37 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Box, Dialog, DialogContent, DialogActions, Button, Typography, Grid } from '@mui/material';
+import React, { useState, useRef } from 'react';
+import { 
+  Box, 
+  Dialog, 
+  DialogContent, 
+  DialogActions, 
+  Button, 
+  Typography, 
+  Paper,
+  Grid
+} from '@mui/material';
 import Layout from '../components/Layout/Layout';
 import ImageUploader from '../components/ImageUploader/ImageUploader';
 import CollageCanvas from '../components/CollageCanvas/CollageCanvas';
-import ControlPanel from '../components/ControlPanel/ControlPanel';
-import GridManager from '../components/GridManager/GridManager';
 
 export default function Home() {
   const [exportedImage, setExportedImage] = useState<string | null>(null);
+  const exportRef = useRef<(() => Promise<string | null>) | null>(null);
 
   // Handle exporting the collage
-  const handleExport = () => {
-    const canvas = document.querySelector('canvas');
-    if (canvas) {
-      const dataUrl = canvas.toDataURL('image/png');
-      setExportedImage(dataUrl);
+  const handleExport = async () => {
+    if (exportRef.current) {
+      try {
+        // exportRef.current() now returns a Promise, so we need to await it
+        const dataUrl = await exportRef.current();
+        if (dataUrl) {
+          setExportedImage(dataUrl);
+        }
+      } catch (error) {
+        console.error("Error exporting collage:", error);
+        // Optionally show an error message to the user
+      }
     }
   };
 
@@ -41,20 +56,34 @@ export default function Home() {
 
   return (
     <Layout>
-      <Box className="collage-workspace" sx={{ flexGrow: 1, gap: 3 }}>
-        <Box sx={{ width: { xs: '100%', md: '25%' }, mb: { xs: 3, md: 0 } }}>
-          <ImageUploader />
-        </Box>
-        
-        <Box sx={{ width: { xs: '100%', md: '50%' }, display: 'flex', flexDirection: 'column', mb: { xs: 3, md: 0 } }}>
-          <GridManager />
-          <CollageCanvas onExport={setExportedImage} />
-        </Box>
-        
-        <Box sx={{ width: { xs: '100%', md: '25%' } }}>
-          <ControlPanel onExport={handleExport} />
-        </Box>
-      </Box>
+      <Grid container spacing={2}>
+        {/* Main content area - Canvas */}
+        <Grid item xs={12} md={9}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <Paper elevation={3} sx={{ p: 2, borderRadius: 2, mb: 2, flexGrow: 1 }}>
+              <CollageCanvas exportRef={exportRef} />
+            </Paper>
+            
+            <Button 
+              variant="contained" 
+              color="primary" 
+              size="large" 
+              onClick={handleExport}
+              sx={{ mt: 2 }}
+              fullWidth
+            >
+              Export Collage
+            </Button>
+          </Box>
+        </Grid>
+
+        {/* Image uploader section */}
+        <Grid item xs={12} md={3}>
+          <Paper elevation={2} sx={{ p: 2, borderRadius: 2, height: '100%' }}>
+            <ImageUploader />
+          </Paper>
+        </Grid>
+      </Grid>
 
       {/* Export Dialog */}
       <Dialog

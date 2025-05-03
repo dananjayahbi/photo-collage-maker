@@ -1,170 +1,258 @@
+'use client';
+
 import React, { useRef, useState } from 'react';
-import { Box, Button, Typography, Stack, Paper, IconButton } from '@mui/material';
-import { AddPhotoAlternate, Delete } from '@mui/icons-material';
+import { 
+  Box, 
+  Button, 
+  Typography, 
+  List, 
+  ListItem, 
+  ListItemText, 
+  ListItemAvatar, 
+  Avatar, 
+  IconButton,
+  Paper,
+  Divider,
+  Alert
+} from '@mui/material';
 import { useCollage } from '../Layout/CollageContext';
-import { CollageImage } from '../../types';
+import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
+import DeleteIcon from '@mui/icons-material/Delete';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 
 const ImageUploader: React.FC = () => {
-  const { images, addImages, removeImage, generateGrid } = useCollage();
-  const [isDragging, setIsDragging] = useState(false);
+  const { images, addImage, removeImage } = useCollage();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
+  // Handle file selection
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
     if (files && files.length > 0) {
-      await addImages(Array.from(files));
+      Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const dataUrl = event.target?.result as string;
+          if (dataUrl) {
+            addImage(file, dataUrl);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+      
+      // Clear file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     }
   };
 
-  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setIsDragging(false);
-    
-    const files = event.dataTransfer.files;
-    if (files && files.length > 0) {
-      await addImages(Array.from(files));
+  // Open file selector
+  const handleSelectFiles = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
     }
   };
 
-  const handleImageClick = (id: string) => {
-    // Handle image selection logic here
+  // Handle drag events for the uploader area
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
   };
 
-  const handleCreateCollage = () => {
-    if (images.length > 0) {
-      generateGrid();
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const dataUrl = event.target?.result as string;
+          if (dataUrl) {
+            addImage(file, dataUrl);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
+  // Handle drag start for image list items (for drag to grid cells)
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    // Set the data format and content explicitly 
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('text/plain', id);
+    e.dataTransfer.setData('application/json', JSON.stringify({ imageId: id }));
+    
+    // Ensure backward compatibility by setting it multiple ways
+    try {
+      e.dataTransfer.setData('imageId', id);
+    } catch (err) {
+      console.warn('Could not set custom MIME type. Using fallbacks.');
+    }
+    
+    // Create a ghost image for dragging
+    const image = images.find(img => img.id === id);
+    if (image?.dataUrl) {
+      const ghostImg = new Image();
+      ghostImg.src = image.dataUrl;
+      ghostImg.style.width = '100px';
+      ghostImg.style.height = '100px';
+      ghostImg.style.objectFit = 'cover';
+      document.body.appendChild(ghostImg);
+      e.dataTransfer.setDragImage(ghostImg, 50, 50);
+      setTimeout(() => {
+        document.body.removeChild(ghostImg);
+      }, 0);
     }
   };
 
   return (
-    <Paper elevation={2} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Typography variant="h6" gutterBottom>
-        Upload Images
-      </Typography>
+    <Box>
+      <Typography variant="h6" gutterBottom>Images</Typography>
       
-      <Box
+      {/* Drag & drop area or button */}
+      <Paper
+        variant="outlined"
         sx={{
-          border: '2px dashed',
-          borderColor: isDragging ? 'primary.main' : 'grey.400',
-          borderRadius: 1,
-          p: 3,
+          p: 2,
+          mb: 2,
           textAlign: 'center',
           backgroundColor: isDragging ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
+          borderColor: isDragging ? 'primary.main' : 'divider',
+          borderStyle: isDragging ? 'dashed' : 'solid',
+          cursor: 'pointer',
           transition: 'all 0.2s',
-          mb: 2,
+          '&:hover': {
+            backgroundColor: 'rgba(0, 0, 0, 0.04)',
+          },
         }}
-        onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
         onDrop={handleDrop}
+        onClick={handleSelectFiles}
       >
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          hidden
-          ref={fileInputRef}
-          onChange={handleFileSelect}
-        />
-        <AddPhotoAlternate fontSize="large" color="primary" />
-        <Typography variant="body1" sx={{ mt: 1 }}>
-          Drag & drop images here
-        </Typography>
-        <Typography variant="body2" color="textSecondary">
-          or
-        </Typography>
-        <Button 
-          variant="outlined" 
-          size="small" 
-          onClick={() => fileInputRef.current?.click()}
-          sx={{ mt: 1 }}
-        >
-          Browse Files
-        </Button>
-      </Box>
-
-      {images.length > 0 && (
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center',
+          gap: 1
+        }}>
+          <AddPhotoAlternateIcon color="primary" fontSize="large" />
+          <Typography variant="body2">
+            {isDragging ? 'Drop images here' : 'Drag & drop images or click to select'}
+          </Typography>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+          />
+        </Box>
+      </Paper>
+      
+      {/* Images list */}
+      {images.length > 0 ? (
         <>
           <Typography variant="subtitle2" gutterBottom>
-            Selected Images ({images.length})
+            {`Uploaded Images (${images.length})`}
           </Typography>
           
-          <Box sx={{ flexGrow: 1, overflow: 'auto', mb: 2 }}>
-            <Stack spacing={1}>
-              {images.map((image: CollageImage) => (
-                <Box
-                  key={image.id}
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    p: 1,
-                    borderRadius: 1,
-                    border: '1px solid',
-                    borderColor: 'grey.300',
-                    '&:hover': {
-                      backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                    },
-                  }}
-                  onClick={() => handleImageClick(image.id)}
-                >
-                  <Box
-                    component="img"
-                    src={image.url}
-                    alt={image.file.name}
+          {/* Instructions for drag and drop */}
+          <Alert severity="info" sx={{ mb: 2, fontSize: '0.75rem' }}>
+            Drag images to grid slots to add them to your collage
+          </Alert>
+          
+          <Box sx={{ maxHeight: '300px', overflow: 'auto', mb: 2 }}>
+            <List dense disablePadding>
+              {images.map((image, index) => (
+                <React.Fragment key={image.id}>
+                  {index > 0 && <Divider variant="inset" component="li" />}
+                  <ListItem
+                    secondaryAction={
+                      <IconButton 
+                        edge="end" 
+                        aria-label="delete" 
+                        onClick={() => removeImage(image.id)}
+                        size="small"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    }
                     sx={{
-                      width: 60,
-                      height: 60,
-                      objectFit: 'cover',
-                      borderRadius: 1,
-                      mr: 1,
+                      cursor: 'grab',
+                      '&:hover': {
+                        backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                      },
                     }}
-                  />
-                  <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
-                    <Typography variant="body2" noWrap title={image.file.name}>
-                      {image.file.name}
-                    </Typography>
-                    <Typography variant="caption" color="textSecondary">
-                      {Math.round(image.width)}x{Math.round(image.height)} • 
-                      {(image.file.size / 1024 / 1024).toFixed(1)} MB
-                    </Typography>
-                  </Box>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeImage(image.id);
-                    }}
+                    draggable={true}
+                    onDragStart={(e) => handleDragStart(e, image.id)}
                   >
-                    <Delete fontSize="small" />
-                  </IconButton>
-                </Box>
+                    <ListItemAvatar>
+                      <Avatar 
+                        variant="rounded" 
+                        src={image.dataUrl} 
+                        alt={`Image ${index + 1}`}
+                        sx={{ width: 40, height: 40, mr: 1 }}
+                      />
+                    </ListItemAvatar>
+                    <ListItemText 
+                      primary={`Image ${index + 1}`} 
+                      secondary={
+                        <Box component="span" sx={{ fontSize: '0.7rem' }}>
+                          {image.file.name.substring(0, 15)}
+                          {image.file.name.length > 15 ? '...' : ''}
+                        </Box>
+                      }
+                    />
+                    <DragIndicatorIcon 
+                      color="action" 
+                      fontSize="small"
+                      sx={{ opacity: 0.5, mr: 1 }}
+                    />
+                  </ListItem>
+                </React.Fragment>
               ))}
-            </Stack>
+            </List>
           </Box>
 
-          <Button 
-            variant="contained" 
-            color="primary" 
-            fullWidth
-            onClick={handleCreateCollage}
-            disabled={images.length === 0}
-          >
-            Create Collage
-          </Button>
+          {images.length > 0 && (
+            <Button
+              variant="outlined"
+              color="error"
+              size="small"
+              onClick={() => {
+                // Confirm before clearing all images
+                if (window.confirm('Are you sure you want to clear all images?')) {
+                  images.forEach(img => removeImage(img.id));
+                }
+              }}
+              fullWidth
+            >
+              Clear All Images
+            </Button>
+          )}
         </>
+      ) : (
+        <Typography color="text.secondary" align="center" sx={{ mt: 4, mb: 4 }}>
+          No images uploaded yet
+        </Typography>
       )}
-    </Paper>
+    </Box>
   );
 };
 

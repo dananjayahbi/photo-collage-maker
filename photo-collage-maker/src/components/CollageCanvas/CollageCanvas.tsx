@@ -1,266 +1,813 @@
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
-import { Box, Paper, Typography, Button } from '@mui/material';
+import { 
+  Box, 
+  Paper, 
+  Typography, 
+  CircularProgress, 
+  IconButton, 
+  Tooltip,
+  Menu,
+  MenuItem,
+  Slider,
+  Card,
+  CardContent,
+  Popover,
+  ButtonGroup,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogActions,
+  Fab
+} from '@mui/material';
+import html2canvas from 'html2canvas';
 import { useCollage } from '../Layout/CollageContext';
-import { GridCell } from '../../types';
+import ZoomInIcon from '@mui/icons-material/ZoomIn';
+import ZoomOutIcon from '@mui/icons-material/ZoomOut';
+import FitScreenIcon from '@mui/icons-material/FitScreen';
+import CropFreeIcon from '@mui/icons-material/CropFree';
+import AspectRatioIcon from '@mui/icons-material/AspectRatio';
+import SettingsIcon from '@mui/icons-material/Settings';
+import CloseIcon from '@mui/icons-material/Close';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
 
 interface CollageCanvasProps {
-  onExport?: (dataUrl: string) => void;
+  exportRef: React.MutableRefObject<(() => Promise<string | null>) | null>;
 }
 
-const CollageCanvas: React.FC<CollageCanvasProps> = ({ onExport }) => {
-  const { grid, images, options, selectedCellId, setSelectedCellId } = useCollage();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
+interface CellControlsState {
+  zoom: number;
+  positionX: number;
+  positionY: number;
+  fit: 'cover' | 'contain' | 'fill';
+}
 
-  // Load images when grid changes
+const initialCellControlState: CellControlsState = {
+  zoom: 100,
+  positionX: 50,
+  positionY: 50,
+  fit: 'cover',
+};
+
+const CollageCanvas: React.FC<CollageCanvasProps> = ({ exportRef }) => {
+  const { grid, images, options, assignImageToCell } = useCollage();
+  const [canvasZoom, setCanvasZoom] = useState(100);
+  const [loading, setLoading] = useState(false);
+  const [cellControls, setCellControls] = useState<Record<string, CellControlsState>>({});
+  const [cellControlsAnchorEl, setCellControlsAnchorEl] = useState<HTMLElement | null>(null);
+  const [activeCellId, setActiveCellId] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  
+  // Theme for controls overlay
+  const controlsTheme = createTheme({
+    palette: {
+      primary: { main: '#ffffff' },
+      secondary: { main: '#2196f3' },
+      background: { paper: 'rgba(0, 0, 0, 0.7)' }
+    },
+  });
+
+  // Set up the export reference for the parent component
   useEffect(() => {
-    if (!grid) return;
-
-    const imageMap = new Map<string, HTMLImageElement>();
-    const imagesToLoad = images.filter(img => 
-      grid.cells.some(cell => cell.imageId === img.id)
-    );
-
-    if (imagesToLoad.length === 0) {
-      drawCanvas(imageMap);
-      return;
+    if (exportRef) {
+      exportRef.current = async () => {
+        if (!canvasRef.current || !grid) return null;
+        
+        // Create a temporary container for export that will be properly rendered
+        const exportContainer = document.createElement('div');
+        exportContainer.style.position = 'absolute';
+        exportContainer.style.left = '-9999px';
+        exportContainer.style.top = '-9999px';
+        exportContainer.style.width = '1000px'; // Fixed width for consistent output
+        exportContainer.style.backgroundColor = options.backgroundColor || '#ffffff';
+        exportContainer.style.padding = '16px';
+        exportContainer.style.boxSizing = 'border-box';
+        document.body.appendChild(exportContainer);
+        
+        // Create grid container with the same styles but without transform scale
+        const gridContainer = document.createElement('div');
+        gridContainer.style.display = 'grid';
+        gridContainer.style.gap = `${options.cellGap || 4}px`;
+        gridContainer.style.width = '100%';
+        gridContainer.style.position = 'relative';
+        
+        // Set specific grid properties based on type (no scaling)
+        switch (grid.type) {
+          case 'standard':
+            gridContainer.style.gridTemplateColumns = `repeat(${grid.columns}, 1fr)`;
+            gridContainer.style.gridTemplateRows = `repeat(${grid.rows}, 1fr)`;
+            gridContainer.style.aspectRatio = `${grid.columns} / ${grid.rows}`;
+            break;
+          
+          case 'masonry':
+            gridContainer.style.gridTemplateColumns = `repeat(${grid.columns}, 1fr)`;
+            gridContainer.style.gridAutoRows = '10px';
+            break;
+          
+          case 'mosaic':
+          case 'featured':
+          case 'split':
+            gridContainer.style.gridTemplateAreas = grid.gridTemplateAreas;
+            gridContainer.style.gridTemplateColumns = grid.gridTemplateColumns;
+            gridContainer.style.gridTemplateRows = grid.gridTemplateRows;
+            gridContainer.style.aspectRatio = '16 / 9';
+            break;
+          
+          case 'horizontal':
+            gridContainer.style.gridTemplateColumns = `repeat(${grid.columns}, 1fr)`;
+            gridContainer.style.gridTemplateRows = '1fr';
+            gridContainer.style.aspectRatio = `${grid.columns} / 1`;
+            break;
+          
+          case 'vertical':
+            gridContainer.style.gridTemplateColumns = '1fr';
+            gridContainer.style.gridTemplateRows = `repeat(${grid.rows}, 1fr)`;
+            gridContainer.style.aspectRatio = `1 / ${grid.rows}`;
+            break;
+        }
+        
+        exportContainer.appendChild(gridContainer);
+        
+        // Create each cell with its image
+        grid.cells.forEach((cell, index) => {
+          const cellImage = cell.imageId ? images.find(img => img.id === cell.imageId) : null;
+          const cellControl = cellControls[cell.id] || initialCellControlState;
+          
+          // Create cell container
+          const cellDiv = document.createElement('div');
+          cellDiv.style.padding = `${options.cellSpacing || 4}px`;
+          cellDiv.style.backgroundColor = options.backgroundColor || '#fff';
+          cellDiv.style.overflow = 'hidden';
+          cellDiv.style.position = 'relative';
+          cellDiv.style.borderRadius = '4px';
+          
+          // Apply grid positioning
+          if (cell.gridArea) cellDiv.style.gridArea = cell.gridArea;
+          if (cell.gridColumn) cellDiv.style.gridColumn = cell.gridColumn;
+          if (cell.gridRow) cellDiv.style.gridRow = cell.gridRow;
+          
+          // For masonry layout
+          if (grid.type === 'masonry') {
+            const cellImage = cell.imageId ? images.find(img => img.id === cell.imageId) : null;
+            const aspectRatio = cellImage?.aspectRatio || 1;
+            const rowSpan = Math.ceil((1 / aspectRatio) * 30);
+            
+            cellDiv.style.gridColumn = `${(index % grid.columns) + 1}`;
+            cellDiv.style.gridRow = `span ${rowSpan}`;
+          }
+          
+          // Create inner content container
+          const innerDiv = document.createElement('div');
+          innerDiv.style.width = '100%';
+          innerDiv.style.height = '100%';
+          innerDiv.style.position = 'relative';
+          innerDiv.style.overflow = 'hidden';
+          innerDiv.style.borderRadius = '2px';
+          innerDiv.style.backgroundColor = cellImage ? 'transparent' : 'rgba(0,0,0,0.05)';
+          innerDiv.style.display = 'flex';
+          innerDiv.style.alignItems = 'center';
+          innerDiv.style.justifyContent = 'center';
+          innerDiv.style.minHeight = '80px';
+          
+          // Add image if exists
+          if (cellImage) {
+            const img = document.createElement('img');
+            img.src = cellImage.dataUrl;
+            img.alt = `Image ${index}`;
+            
+            // Apply image styling from cell controls
+            img.style.width = `${cellControl.zoom}%`;
+            img.style.height = `${cellControl.zoom}%`;
+            img.style.objectFit = cellControl.fit;
+            img.style.objectPosition = `${cellControl.positionX}% ${cellControl.positionY}%`;
+            img.style.position = 'absolute';
+            img.style.top = '50%';
+            img.style.left = '50%';
+            img.style.transform = 'translate(-50%, -50%)';
+            img.style.borderRadius = '2px';
+            img.style.display = 'block';
+            
+            innerDiv.appendChild(img);
+          }
+          
+          cellDiv.appendChild(innerDiv);
+          gridContainer.appendChild(cellDiv);
+        });
+        
+        try {
+          // Use html2canvas with specific options for better rendering
+          const canvas = await html2canvas(gridContainer, {
+            backgroundColor: options.backgroundColor || '#ffffff',
+            logging: false,
+            useCORS: true,
+            allowTaint: true,
+            scale: 2, // Higher quality output
+            imageTimeout: 0,
+            removeContainer: false
+          });
+          
+          const dataUrl = canvas.toDataURL('image/png');
+          
+          // Clean up the temporary elements
+          document.body.removeChild(exportContainer);
+          
+          return dataUrl;
+        } catch (error) {
+          console.error("Error exporting collage:", error);
+          
+          // Clean up even on error
+          if (document.body.contains(exportContainer)) {
+            document.body.removeChild(exportContainer);
+          }
+          
+          return null;
+        }
+      };
     }
+  }, [exportRef, grid, images, options, cellControls]);
 
-    let loadedCount = 0;
-    
-    imagesToLoad.forEach(imgData => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        imageMap.set(imgData.id, img);
-        loadedCount++;
-        
-        if (loadedCount === imagesToLoad.length) {
-          setLoadedImages(imageMap);
-          drawCanvas(imageMap);
-        }
-      };
-      img.onerror = () => {
-        console.error(`Failed to load image: ${imgData.url}`);
-        loadedCount++;
-        
-        if (loadedCount === imagesToLoad.length) {
-          setLoadedImages(imageMap);
-          drawCanvas(imageMap);
-        }
-      };
-      img.src = imgData.url;
-    });
-  }, [grid, images, options]);
-
-  // Redraw canvas when loaded images, options or selected cell changes
+  // Initialize cell controls as cells are created
   useEffect(() => {
-    drawCanvas(loadedImages);
-  }, [loadedImages, options, selectedCellId]);
-
-  // Handle canvas click for cell selection
-  const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!grid || !canvasRef.current) return;
-
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const x = (event.clientX - rect.left) * scaleX;
-    const y = (event.clientY - rect.top) * scaleY;
-
-    // Find which cell was clicked
-    const clickedCell = grid.cells.find(cell => {
-      const cellX = cell.x + options.cellSpacing / 2;
-      const cellY = cell.y + options.cellSpacing / 2;
-      const cellWidth = cell.width - options.cellSpacing;
-      const cellHeight = cell.height - options.cellSpacing;
+    if (grid && grid.cells) {
+      const existingCellIds = Object.keys(cellControls);
+      const newCellIds = grid.cells.map(cell => cell.id);
       
-      return (
-        x >= cellX && 
-        x <= cellX + cellWidth && 
-        y >= cellY && 
-        y <= cellY + cellHeight
-      );
-    });
-
-    if (clickedCell) {
-      setSelectedCellId(clickedCell.id);
+      // Check if we actually need to update the controls
+      const needsUpdate = 
+        newCellIds.length !== existingCellIds.length || 
+        newCellIds.some(id => !existingCellIds.includes(id));
+      
+      if (needsUpdate) {
+        const newCellControls: Record<string, CellControlsState> = {};
+        
+        grid.cells.forEach(cell => {
+          // Preserve existing controls if they exist
+          newCellControls[cell.id] = cellControls[cell.id] || {...initialCellControlState};
+        });
+        
+        setCellControls(newCellControls);
+      }
     }
+  }, [grid?.cells.map(cell => cell.id).join(',')]);
+
+  // Increase canvas zoom level
+  const zoomIn = () => {
+    setCanvasZoom(prev => Math.min(prev + 10, 150));
   };
 
-  // Draw the collage on canvas
-  const drawCanvas = (imageMap: Map<string, HTMLImageElement>) => {
-    if (!grid || !canvasRef.current) return;
+  // Decrease canvas zoom level
+  const zoomOut = () => {
+    setCanvasZoom(prev => Math.max(prev - 10, 50));
+  };
 
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+  // Handle opening cell controls
+  const handleOpenCellControls = (e: React.MouseEvent, cellId: string) => {
+    e.stopPropagation();
+    setCellControlsAnchorEl(e.currentTarget as HTMLElement);
+    setActiveCellId(cellId);
+  };
 
-    // Set canvas dimensions
-    canvas.width = grid.width;
-    canvas.height = grid.height;
+  // Handle closing cell controls
+  const handleCloseCellControls = () => {
+    setCellControlsAnchorEl(null);
+    setActiveCellId(null);
+  };
 
-    // Clear canvas and fill with background color
-    ctx.fillStyle = options.backgroundColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Handle cell zoom change
+  const handleCellZoomChange = (value: number) => {
+    if (!activeCellId) return;
+    
+    setCellControls(prev => ({
+      ...prev,
+      [activeCellId]: {
+        ...prev[activeCellId],
+        zoom: value
+      }
+    }));
+  };
 
-    // Draw each cell
-    grid.cells.forEach(cell => {
-      const x = cell.x + options.cellSpacing / 2;
-      const y = cell.y + options.cellSpacing / 2;
-      const width = cell.width - options.cellSpacing;
-      const height = cell.height - options.cellSpacing;
+  // Handle cell position change
+  const handleCellPositionChange = (axis: 'x' | 'y', value: number) => {
+    if (!activeCellId) return;
+    
+    setCellControls(prev => ({
+      ...prev,
+      [activeCellId]: {
+        ...prev[activeCellId],
+        ...(axis === 'x' ? { positionX: value } : { positionY: value })
+      }
+    }));
+  };
 
-      // Draw cell background
-      ctx.fillStyle = '#e0e0e0';
-      ctx.fillRect(x, y, width, height);
+  // Handle cell fit change
+  const handleCellFitChange = (fit: 'cover' | 'contain' | 'fill') => {
+    if (!activeCellId) return;
+    
+    setCellControls(prev => ({
+      ...prev,
+      [activeCellId]: {
+        ...prev[activeCellId],
+        fit
+      }
+    }));
+  };
 
-      // Draw image if available
-      if (cell.imageId) {
-        const img = imageMap.get(cell.imageId);
-        if (img) {
-          drawImageInCell(ctx, img, cell, options.imageFit);
+  // Handle drag over for cells
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  // Handle drop for cells (to receive images from the ImageUploader)
+  const handleDrop = (e: React.DragEvent, cellId: string) => {
+    e.preventDefault();
+    
+    // Try multiple ways to get the image ID 
+    let imageId = e.dataTransfer.getData('imageId');
+    
+    if (!imageId) {
+      // Try plain text format
+      imageId = e.dataTransfer.getData('text/plain');
+    }
+    
+    if (!imageId) {
+      // Try JSON format
+      try {
+        const jsonData = e.dataTransfer.getData('application/json');
+        if (jsonData) {
+          const data = JSON.parse(jsonData);
+          imageId = data.imageId;
         }
-      }
-
-      // Draw selection border if cell is selected
-      if (cell.id === selectedCellId) {
-        ctx.strokeStyle = '#1976D2';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, width, height);
-      }
-    });
-  };
-
-  // Helper function to draw an image in a cell with proper fit
-  const drawImageInCell = (
-    ctx: CanvasRenderingContext2D, 
-    img: HTMLImageElement, 
-    cell: GridCell, 
-    imageFit: 'fill' | 'contain' | 'cover' | 'none'
-  ) => {
-    const spacing = options.cellSpacing;
-    const cellX = cell.x + spacing / 2;
-    const cellY = cell.y + spacing / 2;
-    const cellWidth = cell.width - spacing;
-    const cellHeight = cell.height - spacing;
-    
-    const imageWidth = img.width;
-    const imageHeight = img.height;
-    const imageRatio = imageWidth / imageHeight;
-    const cellRatio = cellWidth / cellHeight;
-    
-    let width = cellWidth;
-    let height = cellHeight;
-    let x = cellX;
-    let y = cellY;
-    
-    if (imageFit === 'contain') {
-      if (imageRatio > cellRatio) {
-        // Image is wider than cell
-        width = cellWidth;
-        height = width / imageRatio;
-        y = cellY + (cellHeight - height) / 2;
-      } else {
-        // Image is taller than cell
-        height = cellHeight;
-        width = height * imageRatio;
-        x = cellX + (cellWidth - width) / 2;
-      }
-    } else if (imageFit === 'cover') {
-      if (imageRatio > cellRatio) {
-        // Image is wider than cell
-        height = cellHeight;
-        width = height * imageRatio;
-        x = cellX + (cellWidth - width) / 2;
-      } else {
-        // Image is taller than cell
-        width = cellWidth;
-        height = width / imageRatio;
-        y = cellY + (cellHeight - height) / 2;
+      } catch (err) {
+        console.error("Error parsing JSON data from drag event:", err);
       }
     }
     
-    ctx.drawImage(img, x, y, width, height);
+    if (imageId) {
+      assignImageToCell(cellId, imageId);
+    }
   };
 
-  // Handle export button click
-  const handleExportClick = () => {
-    if (!canvasRef.current || !onExport) return;
-    const dataUrl = canvasRef.current.toDataURL('image/png');
-    onExport(dataUrl);
+  // Handle removing image from cell
+  const handleRemoveImageFromCell = (cellId: string) => {
+    assignImageToCell(cellId, undefined);
+    handleCloseCellControls();
   };
 
+  // Get style for a specific cell
+  const getCellStyle = (cell: any) => {
+    return {
+      gridArea: cell.gridArea || undefined,
+      gridColumn: cell.gridColumn || undefined,
+      gridRow: cell.gridRow || undefined,
+      backgroundColor: options.backgroundColor || '#fff',
+      overflow: 'hidden',
+      position: 'relative',
+      borderRadius: '4px',
+      cursor: 'pointer',
+      padding: `${options.cellSpacing || 4}px`,
+      transition: 'all 0.2s',
+      '&:hover': {
+        boxShadow: '0 0 0 2px rgba(25, 118, 210, 0.5)'
+      }
+    };
+  };
+
+  // Get style for an image inside a cell
+  const getImageStyle = (cell: any) => {
+    const cellControl = cellControls[cell.id] || initialCellControlState;
+    const imageFit = cellControl.fit;
+    const zoom = cellControl.zoom / 100;
+    const positionX = cellControl.positionX;
+    const positionY = cellControl.positionY;
+    
+    return {
+      width: `${100 * zoom}%`,
+      height: `${100 * zoom}%`,
+      objectFit: imageFit,
+      objectPosition: `${positionX}% ${positionY}%`,
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      borderRadius: '2px',
+      display: 'block',
+    } as React.CSSProperties;
+  };
+
+  // Get grid container style based on grid type
+  const getGridContainerStyle = () => {
+    if (!grid) return {};
+    
+    // Base styles for all grids
+    const baseStyle: React.CSSProperties = {
+      display: 'grid',
+      gap: `${options.cellGap || 4}px`,
+      width: '100%',
+      transform: `scale(${canvasZoom / 100})`,
+      transformOrigin: 'top left',
+      height: grid.type === 'standard' ? 'auto' : undefined, // Only auto height for standard grids
+    };
+
+    // Different grid styles based on type
+    switch (grid.type) {
+      case 'standard':
+        return {
+          ...baseStyle,
+          gridTemplateColumns: `repeat(${grid.columns}, 1fr)`,
+          gridTemplateRows: `repeat(${grid.rows}, 1fr)`,
+          aspectRatio: grid.columns / grid.rows,
+        };
+      
+      case 'masonry':
+        // Masonry layout with CSS Grid
+        return {
+          ...baseStyle,
+          gridTemplateColumns: `repeat(${grid.columns}, 1fr)`,
+          gridAutoRows: '10px', // Small row height for precise item placement
+        };
+      
+      case 'mosaic':
+        // Mosaic uses grid template areas
+        return {
+          ...baseStyle,
+          gridTemplateAreas: grid.gridTemplateAreas,
+          gridTemplateColumns: grid.gridTemplateColumns,
+          gridTemplateRows: grid.gridTemplateRows,
+          aspectRatio: 16 / 9,
+        };
+      
+      case 'featured':
+        // Featured uses grid template areas
+        return {
+          ...baseStyle,
+          gridTemplateAreas: grid.gridTemplateAreas,
+          gridTemplateColumns: grid.gridTemplateColumns,
+          gridTemplateRows: grid.gridTemplateRows,
+          aspectRatio: 16 / 9,
+        };
+      
+      case 'horizontal':
+        return {
+          ...baseStyle,
+          gridTemplateColumns: `repeat(${grid.columns}, 1fr)`,
+          gridTemplateRows: '1fr',
+          aspectRatio: grid.columns,
+        };
+      
+      case 'vertical':
+        return {
+          ...baseStyle,
+          gridTemplateColumns: '1fr',
+          gridTemplateRows: `repeat(${grid.rows}, 1fr)`,
+          aspectRatio: 1 / grid.rows,
+        };
+      
+      case 'split':
+        return {
+          ...baseStyle,
+          gridTemplateAreas: grid.gridTemplateAreas,
+          gridTemplateColumns: grid.gridTemplateColumns,
+          gridTemplateRows: grid.gridTemplateRows,
+          aspectRatio: 16 / 9,
+        };
+      
+      default:
+        return baseStyle;
+    }
+  };
+
+  // Compute masonry layout styles for specific cells
+  const getMasonryItemStyle = (cell: any, index: number) => {
+    if (grid?.type !== 'masonry') return {};
+    
+    const cellImage = cell.imageId ? images.find(img => img.id === cell.imageId) : null;
+    const aspectRatio = cellImage?.aspectRatio || 1;
+    
+    // Calculate how many grid rows this item should span based on its aspect ratio
+    const rowSpan = Math.ceil((1 / aspectRatio) * 30); // Scale factor for grid rows
+    
+    return {
+      gridColumn: `${(index % grid.columns) + 1}`,
+      gridRow: `span ${rowSpan}`,
+    };
+  };
+
+  // Render cell controls popover
+  const renderCellControls = () => {
+    if (!activeCellId) return null;
+    
+    const cellControl = cellControls[activeCellId] || initialCellControlState;
+    const open = Boolean(cellControlsAnchorEl);
+    
+    return (
+      <ThemeProvider theme={controlsTheme}>
+        <Popover
+          open={open}
+          anchorEl={cellControlsAnchorEl}
+          onClose={handleCloseCellControls}
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'center',
+          }}
+          transformOrigin={{
+            vertical: 'top',
+            horizontal: 'center',
+          }}
+          slotProps={{
+            paper: {
+              sx: {
+                borderRadius: 2,
+                maxWidth: 320,
+                backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                color: 'white',
+              },
+            },
+          }}
+        >
+          <Box sx={{ p: 2, width: 300 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="subtitle1" color="white">Cell Settings</Typography>
+              <IconButton size="small" onClick={handleCloseCellControls} sx={{ color: 'white' }}>
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            </Box>
+            
+            <Typography variant="body2" color="white" gutterBottom>Fit</Typography>
+            <ButtonGroup variant="outlined" fullWidth sx={{ mb: 2 }}>
+              <Button 
+                onClick={() => handleCellFitChange('cover')}
+                variant={cellControl.fit === 'cover' ? 'contained' : 'outlined'}
+                sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}
+              >
+                Cover
+              </Button>
+              <Button 
+                onClick={() => handleCellFitChange('contain')}
+                variant={cellControl.fit === 'contain' ? 'contained' : 'outlined'}
+                sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}
+              >
+                Contain
+              </Button>
+              <Button 
+                onClick={() => handleCellFitChange('fill')}
+                variant={cellControl.fit === 'fill' ? 'contained' : 'outlined'}
+                sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}
+              >
+                Fill
+              </Button>
+            </ButtonGroup>
+            
+            <Typography variant="body2" color="white" gutterBottom>Zoom</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <IconButton size="small" onClick={() => handleCellZoomChange(Math.max(cellControl.zoom - 10, 100))}>
+                <ZoomOutIcon fontSize="small" sx={{ color: 'white' }} />
+              </IconButton>
+              <Slider
+                value={cellControl.zoom}
+                min={100}
+                max={300}
+                step={10}
+                onChange={(e, value) => handleCellZoomChange(value as number)}
+                sx={{ mx: 1 }}
+              />
+              <IconButton size="small" onClick={() => handleCellZoomChange(Math.min(cellControl.zoom + 10, 300))}>
+                <ZoomInIcon fontSize="small" sx={{ color: 'white' }} />
+              </IconButton>
+              <Typography variant="body2" sx={{ ml: 1, minWidth: 40 }} color="white">
+                {cellControl.zoom}%
+              </Typography>
+            </Box>
+            
+            <Typography variant="body2" color="white" gutterBottom>Position X</Typography>
+            <Slider
+              value={cellControl.positionX}
+              min={0}
+              max={100}
+              onChange={(e, value) => handleCellPositionChange('x', value as number)}
+              sx={{ mb: 2 }}
+            />
+            
+            <Typography variant="body2" color="white" gutterBottom>Position Y</Typography>
+            <Slider
+              value={cellControl.positionY}
+              min={0}
+              max={100}
+              onChange={(e, value) => handleCellPositionChange('y', value as number)}
+              sx={{ mb: 2 }}
+            />
+            
+            <Button 
+              variant="contained" 
+              color="error" 
+              onClick={() => handleRemoveImageFromCell(activeCellId)}
+              fullWidth
+              sx={{ mt: 1 }}
+            >
+              Remove Image
+            </Button>
+          </Box>
+        </Popover>
+      </ThemeProvider>
+    );
+  };
+
+  // Render loading state if no grid is available
   if (!grid) {
     return (
       <Paper 
-        elevation={3} 
+        elevation={2} 
         sx={{ 
           p: 4, 
           display: 'flex', 
+          flexDirection: 'column', 
           alignItems: 'center', 
-          justifyContent: 'center', 
-          height: '100%',
-          minHeight: 400,
-          backgroundColor: '#f8f8f8'
+          justifyContent: 'center',
+          height: 400,
+          backgroundColor: options.backgroundColor || '#ffffff',
+          borderRadius: 2
         }}
       >
-        <Typography variant="h6" color="textSecondary">
-          Upload images and create a collage to see the preview here
+        <Typography variant="h6" color="text.secondary" align="center">
+          Select a layout template to create your collage
         </Typography>
       </Paper>
     );
   }
 
   return (
-    <Paper elevation={3} sx={{ p: 2, width: '100%', height: '100%' }}>
-      <Typography variant="h6" gutterBottom>
-        Collage Preview
-      </Typography>
-      
-      <Box sx={{ 
-        width: '100%',
-        maxWidth: '100%',
-        overflow: 'auto',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#f5f5f5',
-        borderRadius: 1,
-        padding: 2
-      }}>
+    <Box sx={{ width: '100%', position: 'relative' }}>
+      <Paper
+        elevation={3}
+        sx={{
+          position: 'relative',
+          width: '100%',
+          backgroundColor: options.backgroundColor,
+          borderRadius: 2,
+          overflow: 'hidden',
+          p: 2
+        }}
+      >
+        {/* Zoom controls */}
         <Box 
-          ref={containerRef}
-          className="canvas-container" 
-          sx={{ maxWidth: '100%', marginBottom: 2 }}
+          sx={{ 
+            position: 'absolute', 
+            top: 8, 
+            right: 8, 
+            backgroundColor: 'rgba(255,255,255,0.8)',
+            borderRadius: '16px',
+            display: 'flex',
+            zIndex: 5,
+          }}
         >
-          <canvas 
-            ref={canvasRef} 
-            onClick={handleCanvasClick}
-            style={{ 
-              maxWidth: '100%', 
-              height: 'auto',
-              display: 'block'
-            }}
-          />
+          <IconButton size="small" onClick={zoomOut} disabled={canvasZoom <= 50}>
+            <ZoomOutIcon />
+          </IconButton>
+          <Typography variant="body2" sx={{ lineHeight: '30px', px: 1 }}>
+            {canvasZoom}%
+          </Typography>
+          <IconButton size="small" onClick={zoomIn} disabled={canvasZoom >= 150}>
+            <ZoomInIcon />
+          </IconButton>
         </Box>
         
-        {onExport && (
-          <Button 
-            variant="contained" 
-            color="primary" 
-            onClick={handleExportClick}
+        {/* The grid container */}
+        <Box 
+          ref={canvasRef}
+          sx={{ 
+            ...getGridContainerStyle(),
+            transition: 'transform 0.2s ease',
+            minHeight: '400px',
+          }}
+        >
+          {grid.cells.map((cell, index) => {
+            const cellImage = cell.imageId ? images.find(img => img.id === cell.imageId) : null;
+            
+            return (
+              <Box
+                key={cell.id}
+                sx={{
+                  ...getCellStyle(cell),
+                  ...(grid.type === 'masonry' ? getMasonryItemStyle(cell, index) : {})
+                }}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, cell.id)}
+              >
+                {/* Cell content */}
+                <Box
+                  sx={{
+                    width: '100%',
+                    height: '100%',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    borderRadius: '2px',
+                    backgroundColor: cellImage ? 'transparent' : 'rgba(0,0,0,0.05)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minHeight: '80px'
+                  }}
+                >
+                  {/* Image */}
+                  {cellImage && (
+                    <img 
+                      src={cellImage.dataUrl} 
+                      alt={`Image ${index}`} 
+                      style={getImageStyle(cell)} 
+                      onLoad={() => setLoading(false)}
+                      onError={() => setLoading(false)}
+                    />
+                  )}
+                  
+                  {/* Cell overlay - only visible when hovered */}
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: 'rgba(0,0,0,0.3)',
+                      opacity: 0,
+                      transition: 'opacity 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexDirection: 'column',
+                      '&:hover': {
+                        opacity: 1,
+                      }
+                    }}
+                  >
+                    {/* Cell settings button */}
+                    {cellImage ? (
+                      <Tooltip title="Cell Settings">
+                        <IconButton 
+                          size="small" 
+                          onClick={(e) => handleOpenCellControls(e, cell.id)}
+                          sx={{
+                            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                            '&:hover': {
+                              backgroundColor: 'rgba(255, 255, 255, 1)',
+                            },
+                          }}
+                        >
+                          <SettingsIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    ) : (
+                      <Typography variant="caption" color="white">
+                        Drop image here
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              </Box>
+            );
+          })}
+        </Box>
+        
+        {/* Cell controls popover */}
+        {renderCellControls()}
+        
+        {/* Loading overlay */}
+        {loading && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(255, 255, 255, 0.7)',
+              zIndex: 2,
+            }}
           >
-            Export Collage
-          </Button>
+            <CircularProgress />
+          </Box>
         )}
+      </Paper>
+      
+      <Box
+        sx={{
+          mt: 1,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <Typography variant="body2" color="text.secondary">
+          Drag images from the sidebar to the grid cells
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {`${grid.cells.length} cells in layout`}
+        </Typography>
       </Box>
-    </Paper>
+    </Box>
   );
 };
 

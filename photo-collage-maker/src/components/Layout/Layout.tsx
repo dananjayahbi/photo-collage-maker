@@ -1,45 +1,63 @@
-import React, { ReactNode } from 'react';
-import { Container, Box } from '@mui/material';
+import React from 'react';
+import { Box, Grid, Paper } from '@mui/material';
 import Header from './Header';
+import GridManager from '../GridManager/GridManager';
 import { CollageProvider } from './CollageContext';
 
-interface LayoutProps {
-  children: ReactNode;
-}
+const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
+  const handleExportCollage = () => {
+    const canvas = document.getElementById('collage-canvas') as HTMLCanvasElement;
+    if (canvas) {
+      const link = document.createElement('a');
+      link.download = 'collage.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+  };
 
-const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <CollageProvider>
-      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        minHeight: '100vh',
+        width: '100vw',
+        overflowX: 'hidden'
+      }}>
         <Header />
-        <Container 
-          component="main" 
-          maxWidth="lg" 
-          sx={{ 
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: 'row', 
+          flexGrow: 1,
+          width: '100%'
+        }}>
+          {/* Layout Sidebar */}
+          <Box 
+            component={Paper} 
+            elevation={3} 
+            sx={{ 
+              width: { xs: '80px', sm: '220px' },
+              p: 2,
+              m: 1,
+              flexShrink: 0,
+              overflowY: 'auto',
+              height: 'calc(100vh - 100px)',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+          >
+            <GridManager onExport={handleExportCollage} />
+          </Box>
+          
+          {/* Main content area */}
+          <Box sx={{ 
+            p: 2, 
             flexGrow: 1, 
-            py: 4,
-            display: 'flex',
-            flexDirection: 'column'
-          }}
-        >
-          {children}
-        </Container>
-        <Box 
-          component="footer" 
-          sx={{ 
-            py: 3, 
-            mt: 'auto', 
-            backgroundColor: 'background.paper', 
-            borderTop: '1px solid', 
-            borderColor: 'divider',
-            textAlign: 'center'
-          }}
-        >
-          <Container maxWidth="lg">
-            <Box sx={{ color: 'text.secondary', fontSize: 14 }}>
-              © {new Date().getFullYear()} Photo Collage Maker - Create beautiful photo compositions
-            </Box>
-          </Container>
+            width: { xs: 'calc(100% - 100px)', sm: 'calc(100% - 240px)' },
+            overflowY: 'auto'
+          }}>
+            {children}
+          </Box>
         </Box>
       </Box>
     </CollageProvider>

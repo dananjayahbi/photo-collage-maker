@@ -1,92 +1,183 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { CollageImage, CollageGrid, CollageOptions, GridCell, ImageFit } from '../../types';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from 'react';
+import { v4 as uuidv4 } from 'uuid';
+import { UploadedImage, GridType, CollageOptions, Cell, CellStyle, GridTemplate } from '../../types';
 
-// Default collage options
-const defaultOptions: CollageOptions = {
-  backgroundColor: '#ffffff',
-  cellSpacing: 2,
-  imageFit: 'cover',
-};
-
-// Context interface
 interface CollageContextType {
-  images: CollageImage[];
-  grid: CollageGrid | null;
-  options: CollageOptions;
-  selectedImageId: string | null;
-  selectedCellId: string | null;
-  addImages: (files: File[]) => Promise<void>;
+  images: UploadedImage[];
+  addImage: (file: File, dataUrl: string) => void;
   removeImage: (id: string) => void;
-  updateGrid: (grid: CollageGrid) => void;
-  generateGrid: () => void;
-  shuffleImages: () => void;
-  setSelectedImageId: (id: string | null) => void;
-  setSelectedCellId: (id: string | null) => void;
+  grid: GridType | null;
+  setGrid: (grid: GridType | null) => void;
+  generateGrid: (template: GridTemplate) => void;
+  assignImageToCell: (cellId: string, imageId: string | undefined) => void;
+  getImageById: (id: string | undefined) => UploadedImage | undefined;
+  updateCellStyle: (cellId: string, style: Partial<CellStyle>) => void;
+  options: CollageOptions;
   updateOptions: (newOptions: Partial<CollageOptions>) => void;
-  assignImageToCell: (imageId: string, cellId: string) => void;
+  shuffleImages: () => void;
+  generateOptimizedGrid: () => void;
+  selectedCellId: string | null;
+  setSelectedCellId: (id: string | null) => void;
+  clearCollage: () => void;
 }
 
-// Create the context
+const defaultOptions: CollageOptions = {
+  cellGap: 4,
+  cellSpacing: 0,
+  cellBorderRadius: 0,
+  backgroundColor: '#ffffff',
+  cellBorderWidth: 0,
+  cellBorderColor: '#000000',
+  padding: 16,
+};
+
+const defaultCellStyle: CellStyle = {
+  objectFit: 'cover',
+  position: { x: 0, y: 0 },
+  zoom: 1,
+};
+
+const STORAGE_KEY = {
+  IMAGES_METADATA: 'photo_collage_images_metadata',
+  GRID: 'photo_collage_grid',
+  OPTIONS: 'photo_collage_options'
+};
+
+// Create a small subset of image data that can be safely stored in session storage
+interface ImageMetadata {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  width?: number;
+  height?: number;
+  aspectRatio?: number;
+}
+
 const CollageContext = createContext<CollageContextType | undefined>(undefined);
 
-// Provider component
-export const CollageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [images, setImages] = useState<CollageImage[]>([]);
-  const [grid, setGrid] = useState<CollageGrid | null>(null);
+export const CollageProvider = ({ children }: { children: ReactNode }) => {
+  const [images, setImages] = useState<UploadedImage[]>([]);
+  const [grid, setGrid] = useState<GridType | null>(null);
   const [options, setOptions] = useState<CollageOptions>(defaultOptions);
-  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
+  
+  // Use refs to prevent infinite loops
+  const isInitialized = useRef(false);
+  const isStorageSaving = useRef(false);
 
-  // Add images to the collage
-  const addImages = async (files: File[]) => {
-    const newImages: CollageImage[] = [];
+  // Load data from session storage on initial render
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !isInitialized.current) {
+      try {
+        // Load grid
+        const savedGrid = sessionStorage.getItem(STORAGE_KEY.GRID);
+        if (savedGrid) {
+          const parsedGrid = JSON.parse(savedGrid) as GridType;
+          setGrid(parsedGrid);
+        }
 
-    for (const file of files) {
-      // Create URL for the image
-      const url = URL.createObjectURL(file);
-      
-      // Get image dimensions
-      const dimensions = await getImageDimensions(url);
-      
-      newImages.push({
-        id: Math.random().toString(36).substr(2, 9),
-        file,
-        url,
-        width: dimensions.width,
-        height: dimensions.height,
-        aspectRatio: dimensions.width / dimensions.height,
-      });
+        // Load options
+        const savedOptions = sessionStorage.getItem(STORAGE_KEY.OPTIONS);
+        if (savedOptions) {
+          const parsedOptions = JSON.parse(savedOptions) as CollageOptions;
+          setOptions(parsedOptions);
+        }
+
+        isInitialized.current = true;
+      } catch (error) {
+        console.error('Error loading from session storage:', error);
+      }
     }
+  }, []);
 
-    setImages([...images, ...newImages]);
-  };
+  // Save grid to session storage (carefully to avoid infinite loops)
+  const saveGridToStorage = useCallback((currentGrid: GridType | null) => {
+    if (typeof window === 'undefined' || !isInitialized.current || isStorageSaving.current || !currentGrid) {
+      return;
+    }
+    
+    try {
+      isStorageSaving.current = true;
+      sessionStorage.setItem(STORAGE_KEY.GRID, JSON.stringify(currentGrid));
+      isStorageSaving.current = false;
+    } catch (error) {
+      console.error('Error saving grid to session storage:', error);
+      isStorageSaving.current = false;
+    }
+  }, []);
 
-  // Get image dimensions
-  const getImageDimensions = (url: string): Promise<{ width: number; height: number }> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        resolve({
-          width: img.width,
-          height: img.height,
+  // Save options to session storage (carefully to avoid infinite loops)
+  const saveOptionsToStorage = useCallback((currentOptions: CollageOptions) => {
+    if (typeof window === 'undefined' || !isInitialized.current || isStorageSaving.current) {
+      return;
+    }
+    
+    try {
+      isStorageSaving.current = true;
+      sessionStorage.setItem(STORAGE_KEY.OPTIONS, JSON.stringify(currentOptions));
+      isStorageSaving.current = false;
+    } catch (error) {
+      console.error('Error saving options to session storage:', error);
+      isStorageSaving.current = false;
+    }
+  }, []);
+
+  // Save grid on changes, but with debouncing to prevent excessive saves
+  useEffect(() => {
+    if (grid && isInitialized.current) {
+      const timeoutId = setTimeout(() => saveGridToStorage(grid), 500);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [grid, saveGridToStorage]);
+
+  // Save options on changes, but with debouncing
+  useEffect(() => {
+    if (isInitialized.current) {
+      const timeoutId = setTimeout(() => saveOptionsToStorage(options), 500);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [options, saveOptionsToStorage]);
+
+  const addImage = (file: File, dataUrl: string) => {
+    const newImage: UploadedImage = {
+      id: uuidv4(),
+      file: {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        lastModified: file.lastModified,
+      },
+      dataUrl,
+    };
+
+    // Load the image to get its dimensions
+    const img = new Image();
+    img.onload = () => {
+      setImages((prevImages) => {
+        const updatedImages = prevImages.map((image) => {
+          if (image.id === newImage.id) {
+            return {
+              ...image,
+              width: img.width,
+              height: img.height,
+              aspectRatio: img.width / img.height,
+            };
+          }
+          return image;
         });
-      };
-      img.src = url;
-    });
+        return updatedImages;
+      });
+    };
+    img.src = dataUrl;
+
+    setImages((prevImages) => [...prevImages, newImage]);
   };
 
-  // Remove an image from the collage
   const removeImage = (id: string) => {
-    // Remove the image URL from memory
-    const imageToRemove = images.find(img => img.id === id);
-    if (imageToRemove) {
-      URL.revokeObjectURL(imageToRemove.url);
-    }
-
-    // Remove image from state
-    setImages(images.filter(img => img.id !== id));
-
-    // Update grid if needed
+    setImages((prevImages) => prevImages.filter((image) => image.id !== id));
+    
+    // Also remove the image from any cell that was using it
     if (grid) {
       const updatedCells = grid.cells.map(cell => {
         if (cell.imageId === id) {
@@ -94,140 +185,437 @@ export const CollageProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
         return cell;
       });
-      setGrid({ ...grid, cells: updatedCells });
+      
+      setGrid({
+        ...grid,
+        cells: updatedCells,
+      });
     }
   };
 
-  // Update grid
-  const updateGrid = (newGrid: CollageGrid) => {
-    setGrid(newGrid);
+  const getImageById = (id: string | undefined) => {
+    if (!id) return undefined;
+    return images.find((image) => image.id === id);
   };
 
-  // Generate grid based on images
-  const generateGrid = () => {
-    if (images.length === 0) return;
-
-    // Calculate optimal grid layout
-    const total = images.length;
-    const aspectRatio = 16 / 9; // Default aspect ratio
+  // Create a grid from a template
+  const generateGrid = (template: GridTemplate) => {
+    if (!template) return;
     
-    let cols = Math.ceil(Math.sqrt(total * aspectRatio));
-    let rows = Math.ceil(total / cols);
+    const cells: Cell[] = [];
+    let newGrid: GridType;
     
-    // Ensure we have at least the minimum number of cells
-    while (rows * cols < total) {
-      cols++;
-    }
-    
-    // Create cells
-    const canvasWidth = 1200;
-    const canvasHeight = canvasWidth / aspectRatio;
-    const cellWidth = canvasWidth / cols;
-    const cellHeight = canvasHeight / rows;
-    
-    const cells: GridCell[] = [];
-    
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        const index = row * cols + col;
-        if (index < total) {
+    // Generate cells based on the template type
+    switch (template.type) {
+      case 'standard': {
+        const rows = template.rows || 2;
+        const columns = template.columns || 2;
+        
+        for (let row = 1; row <= rows; row++) {
+          for (let col = 1; col <= columns; col++) {
+            cells.push({
+              id: uuidv4(),
+              rowStart: row,
+              rowEnd: row + 1,
+              columnStart: col,
+              columnEnd: col + 1,
+              style: { ...defaultCellStyle },
+            });
+          }
+        }
+        
+        newGrid = {
+          type: 'standard',
+          rows,
+          columns,
+          cells,
+        };
+        break;
+      }
+      
+      case 'horizontal': {
+        const columns = template.columns || 3;
+        const rows = 1;
+        
+        for (let col = 1; col <= columns; col++) {
           cells.push({
-            id: `cell-${index}`,
-            x: col * cellWidth,
-            y: row * cellHeight,
-            width: cellWidth,
-            height: cellHeight,
-            imageId: images[index].id,
+            id: uuidv4(),
+            rowStart: 1,
+            rowEnd: 2,
+            columnStart: col,
+            columnEnd: col + 1,
+            style: { ...defaultCellStyle },
           });
         }
+        
+        newGrid = {
+          type: 'horizontal',
+          rows,
+          columns,
+          cells,
+        };
+        break;
+      }
+      
+      case 'vertical': {
+        const rows = template.rows || 3;
+        const columns = 1;
+        
+        for (let row = 1; row <= rows; row++) {
+          cells.push({
+            id: uuidv4(),
+            rowStart: row,
+            rowEnd: row + 1,
+            columnStart: 1,
+            columnEnd: 2,
+            style: { ...defaultCellStyle },
+          });
+        }
+        
+        newGrid = {
+          type: 'vertical',
+          rows,
+          columns,
+          cells,
+        };
+        break;
+      }
+      
+      case 'masonry': {
+        const columns = template.columns || 3;
+        const cellCount = Math.max(columns * 2, images.length || 0); // At least 2 rows worth of cells
+        
+        for (let i = 0; i < cellCount; i++) {
+          cells.push({
+            id: uuidv4(),
+            columnStart: (i % columns) + 1,
+            columnEnd: (i % columns) + 2,
+            style: { ...defaultCellStyle },
+          });
+        }
+        
+        newGrid = {
+          type: 'masonry',
+          columns,
+          cells,
+        };
+        break;
+      }
+      
+      case 'mosaic': {
+        // Create a 3x3 asymmetric grid
+        const gridAreas = `
+          "large large small-1"
+          "large large small-2"
+          "small-3 small-4 small-5"
+        `;
+        
+        const areas = ['large', 'small-1', 'small-2', 'small-3', 'small-4', 'small-5'];
+        
+        areas.forEach(area => {
+          cells.push({
+            id: uuidv4(),
+            gridArea: area,
+            style: { ...defaultCellStyle },
+          });
+        });
+        
+        newGrid = {
+          type: 'mosaic',
+          gridTemplateAreas: gridAreas.trim(),
+          gridTemplateColumns: '1fr 1fr 1fr',
+          gridTemplateRows: '1fr 1fr 1fr',
+          cells,
+        };
+        break;
+      }
+      
+      case 'featured': {
+        // One large image with column of smaller images
+        const gridAreas = `
+          "feature secondary-1"
+          "feature secondary-2"
+          "feature secondary-3"
+        `;
+        
+        const areas = ['feature', 'secondary-1', 'secondary-2', 'secondary-3'];
+        
+        areas.forEach(area => {
+          cells.push({
+            id: uuidv4(),
+            gridArea: area,
+            style: { ...defaultCellStyle },
+          });
+        });
+        
+        newGrid = {
+          type: 'featured',
+          gridTemplateAreas: gridAreas.trim(),
+          gridTemplateColumns: '2fr 1fr',
+          gridTemplateRows: 'repeat(3, 1fr)',
+          cells,
+        };
+        break;
+      }
+      
+      case 'split': {
+        // Split view based on orientation
+        const isHorizontal = template.orientation === 'horizontal';
+        
+        const gridAreas = isHorizontal ? 
+          `"top top"
+           "bottom-left bottom-right"` :
+          `"left top-right"
+           "left bottom-right"`;
+        
+        const areas = isHorizontal ? 
+          ['top', 'bottom-left', 'bottom-right'] : 
+          ['left', 'top-right', 'bottom-right'];
+        
+        areas.forEach(area => {
+          cells.push({
+            id: uuidv4(),
+            gridArea: area,
+            style: { ...defaultCellStyle },
+          });
+        });
+        
+        newGrid = {
+          type: 'split',
+          orientation: template.orientation,
+          gridTemplateAreas: gridAreas.trim(),
+          gridTemplateColumns: isHorizontal ? '1fr 1fr' : '1fr 1fr',
+          gridTemplateRows: isHorizontal ? '1fr 1fr' : '1fr 1fr',
+          cells,
+        };
+        break;
+      }
+      
+      // You could add more custom template types here
+      
+      default: {
+        // Default to a 2x2 grid
+        const rows = 2;
+        const columns = 2;
+        
+        for (let row = 1; row <= rows; row++) {
+          for (let col = 1; col <= columns; col++) {
+            cells.push({
+              id: uuidv4(),
+              rowStart: row,
+              rowEnd: row + 1,
+              columnStart: col,
+              columnEnd: col + 1,
+              style: { ...defaultCellStyle },
+            });
+          }
+        }
+        
+        newGrid = {
+          type: 'standard',
+          rows,
+          columns,
+          cells,
+        };
       }
     }
     
-    setGrid({
-      rows,
-      columns: cols,
-      width: canvasWidth,
-      height: canvasHeight,
-      cells,
-    });
+    // Set the grid once at the end
+    setGrid(newGrid);
+    
+    // Clear selected cell
+    setSelectedCellId(null);
   };
 
-  // Shuffle images in the grid
-  const shuffleImages = () => {
-    if (!grid || images.length === 0) return;
-    
-    // Get all images that are in the grid
-    const imageIds = images.map(img => img.id);
-    
-    // Shuffle the image IDs
-    const shuffledIds = [...imageIds].sort(() => Math.random() - 0.5);
-    
-    // Assign shuffled images to cells
-    const updatedCells = grid.cells.map((cell, index) => {
-      if (index < shuffledIds.length) {
-        return { ...cell, imageId: shuffledIds[index] };
-      }
-      return cell;
-    });
-    
-    setGrid({ ...grid, cells: updatedCells });
-  };
-
-  // Update collage options
-  const updateOptions = (newOptions: Partial<CollageOptions>) => {
-    setOptions({ ...options, ...newOptions });
-  };
-
-  // Assign an image to a cell
-  const assignImageToCell = (imageId: string, cellId: string) => {
+  const assignImageToCell = (cellId: string, imageId: string | undefined) => {
     if (!grid) return;
-    
-    const updatedCells = grid.cells.map(cell => {
-      // If the cell is the target, assign the image
+
+    const updatedCells = grid.cells.map((cell) => {
       if (cell.id === cellId) {
         return { ...cell, imageId };
       }
-      // If the image is already in another cell, remove it
-      if (cell.imageId === imageId) {
-        return { ...cell, imageId: undefined };
+      return cell;
+    });
+
+    setGrid({
+      ...grid,
+      cells: updatedCells,
+    });
+  };
+
+  const updateCellStyle = (cellId: string, styleUpdate: Partial<CellStyle>) => {
+    if (!grid) return;
+
+    const updatedCells = grid.cells.map((cell) => {
+      if (cell.id === cellId) {
+        return { 
+          ...cell, 
+          style: { 
+            ...cell.style, 
+            ...styleUpdate 
+          } 
+        };
       }
       return cell;
     });
+
+    setGrid({
+      ...grid,
+      cells: updatedCells,
+    });
+  };
+
+  const updateOptions = (newOptions: Partial<CollageOptions>) => {
+    setOptions((prevOptions) => ({
+      ...prevOptions,
+      ...newOptions,
+    }));
+  };
+
+  const shuffleImages = () => {
+    if (!grid || images.length === 0) return;
     
-    setGrid({ ...grid, cells: updatedCells });
+    // Get a random selection of images
+    const shuffledImages = [...images].sort(() => Math.random() - 0.5);
+    
+    // Assign them to cells
+    const updatedCells = grid.cells.map((cell, index) => {
+      return {
+        ...cell,
+        imageId: index < shuffledImages.length ? shuffledImages[index].id : undefined
+      };
+    });
+    
+    setGrid({
+      ...grid,
+      cells: updatedCells
+    });
   };
 
-  // Clean up image URLs when component unmounts
-  useEffect(() => {
-    return () => {
-      images.forEach(image => {
-        URL.revokeObjectURL(image.url);
+  const generateOptimizedGrid = () => {
+    if (images.length === 0) return;
+    
+    // Determine grid layout based on number of images
+    const numImages = images.length;
+    let template: GridTemplate;
+    
+    if (numImages === 1) {
+      template = { name: '1 × 1', type: 'standard', rows: 1, columns: 1, orientation: 'square' };
+    } else if (numImages === 2) {
+      // For 2 images, check if they're both landscape or both portrait
+      const landscapeCount = images.filter(img => (img.width || 1) > (img.height || 1)).length;
+      
+      if (landscapeCount === 2) {
+        template = { name: '2 × 1', type: 'vertical', rows: 2, columns: 1, orientation: 'portrait' };
+      } else if (landscapeCount === 0) {
+        template = { name: '1 × 2', type: 'horizontal', rows: 1, columns: 2, orientation: 'landscape' };
+      } else {
+        template = { name: '2 × 1', type: 'vertical', rows: 2, columns: 1, orientation: 'portrait' };
+      }
+    } else if (numImages === 3) {
+      template = { name: 'Split', type: 'split', orientation: 'horizontal' };
+    } else if (numImages === 4) {
+      template = { name: '2 × 2', type: 'standard', rows: 2, columns: 2, orientation: 'square' };
+    } else if (numImages <= 6) {
+      template = { name: '2 × 3', type: 'standard', rows: 2, columns: 3, orientation: 'landscape' };
+    } else if (numImages <= 9) {
+      template = { name: '3 × 3', type: 'standard', rows: 3, columns: 3, orientation: 'square' };
+    } else if (numImages <= 12) {
+      template = { name: '3 × 4', type: 'standard', rows: 3, columns: 4, orientation: 'landscape' };
+    } else {
+      template = { name: 'Masonry', type: 'masonry', columns: 4, orientation: 'mixed' };
+    }
+    
+    // Generate the grid
+    generateGrid(template);
+    
+    // Assign images to cells after a short delay to ensure grid is created
+    setTimeout(() => {
+      if (!grid) return;
+      
+      const updatedCells = grid.cells.map((cell, index) => {
+        return {
+          ...cell,
+          imageId: index < images.length ? images[index].id : undefined
+        };
       });
-    };
-  }, []);
-
-  const value = {
-    images,
-    grid,
-    options,
-    selectedImageId,
-    selectedCellId,
-    addImages,
-    removeImage,
-    updateGrid,
-    generateGrid,
-    shuffleImages,
-    setSelectedImageId,
-    setSelectedCellId,
-    updateOptions,
-    assignImageToCell,
+      
+      setGrid(prevGrid => {
+        if (!prevGrid) return null;
+        return {
+          ...prevGrid,
+          cells: updatedCells
+        };
+      });
+    }, 100);
   };
 
-  return <CollageContext.Provider value={value}>{children}</CollageContext.Provider>;
+  // Clear all collage data and session storage
+  const clearCollage = () => {
+    setImages([]);
+    setGrid(null);
+    setOptions(defaultOptions);
+    setSelectedCellId(null);
+    
+    // Clear session storage
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem(STORAGE_KEY.IMAGES_METADATA);
+      sessionStorage.removeItem(STORAGE_KEY.GRID);
+      sessionStorage.removeItem(STORAGE_KEY.OPTIONS);
+    }
+  };
+
+  useEffect(() => {
+    // Clean up any cells that reference deleted images
+    if (grid) {
+      const imageIds = images.map((img) => img.id);
+      let hasChanges = false;
+      
+      const updatedCells = grid.cells.map((cell) => {
+        if (cell.imageId && !imageIds.includes(cell.imageId)) {
+          hasChanges = true;
+          return { ...cell, imageId: undefined };
+        }
+        return cell;
+      });
+
+      // Only update the grid if there were actually changes
+      if (hasChanges) {
+        setGrid({
+          ...grid,
+          cells: updatedCells,
+        });
+      }
+    }
+  }, [images, grid]);
+
+  return (
+    <CollageContext.Provider
+      value={{
+        images,
+        addImage,
+        removeImage,
+        grid,
+        setGrid,
+        generateGrid,
+        assignImageToCell,
+        getImageById,
+        updateCellStyle,
+        options,
+        updateOptions,
+        shuffleImages,
+        generateOptimizedGrid,
+        selectedCellId,
+        setSelectedCellId,
+        clearCollage,
+      }}
+    >
+      {children}
+    </CollageContext.Provider>
+  );
 };
 
-// Custom hook to use the collage context
-export const useCollage = () => {
+export const useCollage = (): CollageContextType => {
   const context = useContext(CollageContext);
   if (context === undefined) {
     throw new Error('useCollage must be used within a CollageProvider');
