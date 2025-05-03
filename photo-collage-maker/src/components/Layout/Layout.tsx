@@ -1,45 +1,47 @@
-import React, { ReactNode } from 'react';
-import { Container, Box } from '@mui/material';
+import React from 'react';
+import { Box, Grid } from '@mui/material';
 import Header from './Header';
+import ImageUploader from '../ImageUploader/ImageUploader';
+import GridManager from '../GridManager/GridManager';
+import CollageCanvas from '../CollageCanvas/CollageCanvas';
 import { CollageProvider } from './CollageContext';
 
-interface LayoutProps {
-  children: ReactNode;
-}
+const Layout: React.FC = () => {
+  const handleExportCollage = () => {
+    const canvas = document.getElementById('collage-canvas') as HTMLCanvasElement;
+    if (canvas) {
+      const link = document.createElement('a');
+      link.download = 'collage.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+  };
 
-const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <CollageProvider>
-      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        minHeight: '100vh',
+        width: '100%',
+        overflowX: 'hidden'
+      }}>
         <Header />
-        <Container 
-          component="main" 
-          maxWidth="lg" 
-          sx={{ 
-            flexGrow: 1, 
-            py: 4,
-            display: 'flex',
-            flexDirection: 'column'
-          }}
-        >
-          {children}
-        </Container>
-        <Box 
-          component="footer" 
-          sx={{ 
-            py: 3, 
-            mt: 'auto', 
-            backgroundColor: 'background.paper', 
-            borderTop: '1px solid', 
-            borderColor: 'divider',
-            textAlign: 'center'
-          }}
-        >
-          <Container maxWidth="lg">
-            <Box sx={{ color: 'text.secondary', fontSize: 14 }}>
-              © {new Date().getFullYear()} Photo Collage Maker - Create beautiful photo compositions
-            </Box>
-          </Container>
+        <Box component="main" sx={{ flexGrow: 1, py: 3, px: 3, maxWidth: '100%' }}>
+          <Grid container spacing={3}>
+            {/* Main content area - full width */}
+            <Grid md={12}>
+              <Box sx={{ mb: 4, maxWidth: '100%' }}>
+                <ImageUploader />
+              </Box>
+              <Box sx={{ mb: 4, maxWidth: '100%' }}>
+                <CollageCanvas exportRef={null} />
+              </Box>
+              <Box sx={{ maxWidth: '100%' }}>
+                <GridManager onExport={handleExportCollage} />
+              </Box>
+            </Grid>
+          </Grid>
         </Box>
       </Box>
     </CollageProvider>
