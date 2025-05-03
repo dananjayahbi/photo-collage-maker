@@ -1,12 +1,10 @@
 import React from 'react';
-import { Box, Grid } from '@mui/material';
+import { Box, Grid, Paper } from '@mui/material';
 import Header from './Header';
-import ImageUploader from '../ImageUploader/ImageUploader';
 import GridManager from '../GridManager/GridManager';
-import CollageCanvas from '../CollageCanvas/CollageCanvas';
 import { CollageProvider } from './CollageContext';
 
-const Layout: React.FC = () => {
+const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const handleExportCollage = () => {
     const canvas = document.getElementById('collage-canvas') as HTMLCanvasElement;
     if (canvas) {
@@ -23,25 +21,43 @@ const Layout: React.FC = () => {
         display: 'flex', 
         flexDirection: 'column', 
         minHeight: '100vh',
-        width: '100%',
+        width: '100vw',
         overflowX: 'hidden'
       }}>
         <Header />
-        <Box component="main" sx={{ flexGrow: 1, py: 3, px: 3, maxWidth: '100%' }}>
-          <Grid container spacing={3}>
-            {/* Main content area - full width */}
-            <Grid md={12}>
-              <Box sx={{ mb: 4, maxWidth: '100%' }}>
-                <ImageUploader />
-              </Box>
-              <Box sx={{ mb: 4, maxWidth: '100%' }}>
-                <CollageCanvas exportRef={null} />
-              </Box>
-              <Box sx={{ maxWidth: '100%' }}>
-                <GridManager onExport={handleExportCollage} />
-              </Box>
-            </Grid>
-          </Grid>
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: 'row', 
+          flexGrow: 1,
+          width: '100%'
+        }}>
+          {/* Layout Sidebar */}
+          <Box 
+            component={Paper} 
+            elevation={3} 
+            sx={{ 
+              width: { xs: '80px', sm: '220px' },
+              p: 2,
+              m: 1,
+              flexShrink: 0,
+              overflowY: 'auto',
+              height: 'calc(100vh - 100px)',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+          >
+            <GridManager onExport={handleExportCollage} />
+          </Box>
+          
+          {/* Main content area */}
+          <Box sx={{ 
+            p: 2, 
+            flexGrow: 1, 
+            width: { xs: 'calc(100% - 100px)', sm: 'calc(100% - 240px)' },
+            overflowY: 'auto'
+          }}>
+            {children}
+          </Box>
         </Box>
       </Box>
     </CollageProvider>

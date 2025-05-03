@@ -179,7 +179,27 @@ const CollageCanvas: React.FC<CollageCanvasProps> = ({ exportRef }) => {
   const handleDrop = (e: React.DragEvent, cellId: string) => {
     e.preventDefault();
     
-    const imageId = e.dataTransfer.getData('imageId');
+    // Try multiple ways to get the image ID 
+    let imageId = e.dataTransfer.getData('imageId');
+    
+    if (!imageId) {
+      // Try plain text format
+      imageId = e.dataTransfer.getData('text/plain');
+    }
+    
+    if (!imageId) {
+      // Try JSON format
+      try {
+        const jsonData = e.dataTransfer.getData('application/json');
+        if (jsonData) {
+          const data = JSON.parse(jsonData);
+          imageId = data.imageId;
+        }
+      } catch (err) {
+        console.error("Error parsing JSON data from drag event:", err);
+      }
+    }
+    
     if (imageId) {
       assignImageToCell(cellId, imageId);
     }

@@ -8,14 +8,12 @@ import {
   DialogActions, 
   Button, 
   Typography, 
-  Container, 
   Paper,
   Grid
 } from '@mui/material';
 import Layout from '../components/Layout/Layout';
 import ImageUploader from '../components/ImageUploader/ImageUploader';
 import CollageCanvas from '../components/CollageCanvas/CollageCanvas';
-import GridManager from '../components/GridManager/GridManager';
 
 export default function Home() {
   const [exportedImage, setExportedImage] = useState<string | null>(null);
@@ -52,44 +50,34 @@ export default function Home() {
 
   return (
     <Layout>
-      <Container maxWidth={false} sx={{ py: 3, px: { xs: 2, sm: 3 }, width: '100%' }}>
-        <Grid container spacing={3}>
-          {/* Layout Selection Area */}
-          <Grid item xs={12}>
-            <Paper elevation={2} sx={{ p: 2, borderRadius: 2, mb: 2 }}>
-              <Typography variant="h6" gutterBottom>Layout Selection</Typography>
-              <GridManager />
+      <Grid container spacing={2}>
+        {/* Main content area - Canvas */}
+        <Grid item xs={12} md={9}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <Paper elevation={3} sx={{ p: 2, borderRadius: 2, mb: 2, flexGrow: 1 }}>
+              <CollageCanvas exportRef={exportRef} />
             </Paper>
-          </Grid>
-          
-          {/* Main content area - Canvas */}
-          <Grid item xs={12} md={9}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              <Paper elevation={3} sx={{ p: 2, borderRadius: 2, mb: 2, flexGrow: 1 }}>
-                <CollageCanvas exportRef={exportRef} />
-              </Paper>
-              
-              <Button 
-                variant="contained" 
-                color="primary" 
-                size="large" 
-                onClick={handleExport}
-                sx={{ mt: 2 }}
-                fullWidth
-              >
-                Export Collage
-              </Button>
-            </Box>
-          </Grid>
-
-          {/* Image uploader section */}
-          <Grid item xs={12} md={3}>
-            <Paper elevation={2} sx={{ p: 2, borderRadius: 2, height: '100%' }}>
-              <ImageUploader />
-            </Paper>
-          </Grid>
+            
+            <Button 
+              variant="contained" 
+              color="primary" 
+              size="large" 
+              onClick={handleExport}
+              sx={{ mt: 2 }}
+              fullWidth
+            >
+              Export Collage
+            </Button>
+          </Box>
         </Grid>
-      </Container>
+
+        {/* Image uploader section */}
+        <Grid item xs={12} md={3}>
+          <Paper elevation={2} sx={{ p: 2, borderRadius: 2, height: '100%' }}>
+            <ImageUploader />
+          </Paper>
+        </Grid>
+      </Grid>
 
       {/* Export Dialog */}
       <Dialog

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { UploadedImage, GridType, CollageOptions, Cell, CellStyle, GridTemplate } from '../../types';
 
@@ -18,6 +18,7 @@ interface CollageContextType {
   generateOptimizedGrid: () => void;
   selectedCellId: string | null;
   setSelectedCellId: (id: string | null) => void;
+  clearCollage: () => void;
 }
 
 const defaultOptions: CollageOptions = {
@@ -36,6 +37,23 @@ const defaultCellStyle: CellStyle = {
   zoom: 1,
 };
 
+const STORAGE_KEY = {
+  IMAGES_METADATA: 'photo_collage_images_metadata',
+  GRID: 'photo_collage_grid',
+  OPTIONS: 'photo_collage_options'
+};
+
+// Create a small subset of image data that can be safely stored in session storage
+interface ImageMetadata {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  width?: number;
+  height?: number;
+  aspectRatio?: number;
+}
+
 const CollageContext = createContext<CollageContextType | undefined>(undefined);
 
 export const CollageProvider = ({ children }: { children: ReactNode }) => {
@@ -43,28 +61,113 @@ export const CollageProvider = ({ children }: { children: ReactNode }) => {
   const [grid, setGrid] = useState<GridType | null>(null);
   const [options, setOptions] = useState<CollageOptions>(defaultOptions);
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
+  
+  // Use refs to prevent infinite loops
+  const isInitialized = useRef(false);
+  const isStorageSaving = useRef(false);
+
+  // Load data from session storage on initial render
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !isInitialized.current) {
+      try {
+        // Load grid
+        const savedGrid = sessionStorage.getItem(STORAGE_KEY.GRID);
+        if (savedGrid) {
+          const parsedGrid = JSON.parse(savedGrid) as GridType;
+          setGrid(parsedGrid);
+        }
+
+        // Load options
+        const savedOptions = sessionStorage.getItem(STORAGE_KEY.OPTIONS);
+        if (savedOptions) {
+          const parsedOptions = JSON.parse(savedOptions) as CollageOptions;
+          setOptions(parsedOptions);
+        }
+
+        isInitialized.current = true;
+      } catch (error) {
+        console.error('Error loading from session storage:', error);
+      }
+    }
+  }, []);
+
+  // Save grid to session storage (carefully to avoid infinite loops)
+  const saveGridToStorage = useCallback((currentGrid: GridType | null) => {
+    if (typeof window === 'undefined' || !isInitialized.current || isStorageSaving.current || !currentGrid) {
+      return;
+    }
+    
+    try {
+      isStorageSaving.current = true;
+      sessionStorage.setItem(STORAGE_KEY.GRID, JSON.stringify(currentGrid));
+      isStorageSaving.current = false;
+    } catch (error) {
+      console.error('Error saving grid to session storage:', error);
+      isStorageSaving.current = false;
+    }
+  }, []);
+
+  // Save options to session storage (carefully to avoid infinite loops)
+  const saveOptionsToStorage = useCallback((currentOptions: CollageOptions) => {
+    if (typeof window === 'undefined' || !isInitialized.current || isStorageSaving.current) {
+      return;
+    }
+    
+    try {
+      isStorageSaving.current = true;
+      sessionStorage.setItem(STORAGE_KEY.OPTIONS, JSON.stringify(currentOptions));
+      isStorageSaving.current = false;
+    } catch (error) {
+      console.error('Error saving options to session storage:', error);
+      isStorageSaving.current = false;
+    }
+  }, []);
+
+  // Save grid on changes, but with debouncing to prevent excessive saves
+  useEffect(() => {
+    if (grid && isInitialized.current) {
+      const timeoutId = setTimeout(() => saveGridToStorage(grid), 500);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [grid, saveGridToStorage]);
+
+  // Save options on changes, but with debouncing
+  useEffect(() => {
+    if (isInitialized.current) {
+      const timeoutId = setTimeout(() => saveOptionsToStorage(options), 500);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [options, saveOptionsToStorage]);
 
   const addImage = (file: File, dataUrl: string) => {
     const newImage: UploadedImage = {
       id: uuidv4(),
-      file,
+      file: {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        lastModified: file.lastModified,
+      },
       dataUrl,
     };
 
     // Load the image to get its dimensions
     const img = new Image();
     img.onload = () => {
-      setImages((prevImages) => prevImages.map((image) => {
-        if (image.id === newImage.id) {
-          return {
-            ...image,
-            width: img.width,
-            height: img.height,
-            aspectRatio: img.width / img.height,
-          };
-        }
-        return image;
-      }));
+      setImages((prevImages) => {
+        const updatedImages = prevImages.map((image) => {
+          if (image.id === newImage.id) {
+            return {
+              ...image,
+              width: img.width,
+              height: img.height,
+              aspectRatio: img.width / img.height,
+            };
+          }
+          return image;
+        });
+        return updatedImages;
+      });
     };
     img.src = dataUrl;
 
@@ -447,21 +550,42 @@ export const CollageProvider = ({ children }: { children: ReactNode }) => {
     }, 100);
   };
 
+  // Clear all collage data and session storage
+  const clearCollage = () => {
+    setImages([]);
+    setGrid(null);
+    setOptions(defaultOptions);
+    setSelectedCellId(null);
+    
+    // Clear session storage
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem(STORAGE_KEY.IMAGES_METADATA);
+      sessionStorage.removeItem(STORAGE_KEY.GRID);
+      sessionStorage.removeItem(STORAGE_KEY.OPTIONS);
+    }
+  };
+
   useEffect(() => {
     // Clean up any cells that reference deleted images
     if (grid) {
       const imageIds = images.map((img) => img.id);
+      let hasChanges = false;
+      
       const updatedCells = grid.cells.map((cell) => {
         if (cell.imageId && !imageIds.includes(cell.imageId)) {
+          hasChanges = true;
           return { ...cell, imageId: undefined };
         }
         return cell;
       });
 
-      setGrid({
-        ...grid,
-        cells: updatedCells,
-      });
+      // Only update the grid if there were actually changes
+      if (hasChanges) {
+        setGrid({
+          ...grid,
+          cells: updatedCells,
+        });
+      }
     }
   }, [images, grid]);
 
@@ -483,6 +607,7 @@ export const CollageProvider = ({ children }: { children: ReactNode }) => {
         generateOptimizedGrid,
         selectedCellId,
         setSelectedCellId,
+        clearCollage,
       }}
     >
       {children}

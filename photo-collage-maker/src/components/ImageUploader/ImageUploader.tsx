@@ -90,7 +90,17 @@ const ImageUploader: React.FC = () => {
 
   // Handle drag start for image list items (for drag to grid cells)
   const handleDragStart = (e: React.DragEvent, id: string) => {
-    e.dataTransfer.setData('imageId', id);
+    // Set the data format and content explicitly 
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('text/plain', id);
+    e.dataTransfer.setData('application/json', JSON.stringify({ imageId: id }));
+    
+    // Ensure backward compatibility by setting it multiple ways
+    try {
+      e.dataTransfer.setData('imageId', id);
+    } catch (err) {
+      console.warn('Could not set custom MIME type. Using fallbacks.');
+    }
     
     // Create a ghost image for dragging
     const image = images.find(img => img.id === id);
@@ -189,7 +199,7 @@ const ImageUploader: React.FC = () => {
                         backgroundColor: 'rgba(0, 0, 0, 0.04)'
                       },
                     }}
-                    draggable
+                    draggable={true}
                     onDragStart={(e) => handleDragStart(e, image.id)}
                   >
                     <ListItemAvatar>
@@ -219,6 +229,23 @@ const ImageUploader: React.FC = () => {
               ))}
             </List>
           </Box>
+
+          {images.length > 0 && (
+            <Button
+              variant="outlined"
+              color="error"
+              size="small"
+              onClick={() => {
+                // Confirm before clearing all images
+                if (window.confirm('Are you sure you want to clear all images?')) {
+                  images.forEach(img => removeImage(img.id));
+                }
+              }}
+              fullWidth
+            >
+              Clear All Images
+            </Button>
+          )}
         </>
       ) : (
         <Typography color="text.secondary" align="center" sx={{ mt: 4, mb: 4 }}>

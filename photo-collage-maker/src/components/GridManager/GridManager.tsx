@@ -39,12 +39,13 @@ interface GridLayoutPreviewProps {
   onClick: () => void;
 }
 
+// Modified GridLayoutPreview component with smaller previews that fit in a sidebar
 const GridLayoutPreview: React.FC<GridLayoutPreviewProps> = ({ template, selected, onClick }) => {
   const theme = useTheme();
   
   const renderPreview = () => {
     const cells = [];
-    const gap = '2px';
+    const gap = '1px';
     
     switch (template.type) {
       case 'standard':
@@ -72,7 +73,7 @@ const GridLayoutPreview: React.FC<GridLayoutPreviewProps> = ({ template, selecte
               gridTemplateColumns: `repeat(${cols}, 1fr)`,
               gap,
               width: '100%',
-              height: '70px',
+              height: '50px', // Smaller height for sidebar
               cursor: 'pointer',
               '&:hover': {
                 '& > div': {
@@ -97,7 +98,7 @@ const GridLayoutPreview: React.FC<GridLayoutPreviewProps> = ({ template, selecte
               gridTemplateColumns: `repeat(${columns}, 1fr)`,
               gap,
               width: '100%',
-              height: '70px',
+              height: '50px', // Smaller height for sidebar
               cursor: 'pointer',
               '&:hover': {
                 '& > div': {
@@ -149,7 +150,7 @@ const GridLayoutPreview: React.FC<GridLayoutPreviewProps> = ({ template, selecte
               gridTemplateRows: '1fr 1fr 1fr',
               gap,
               width: '100%',
-              height: '70px',
+              height: '50px', // Smaller height for sidebar
               cursor: 'pointer',
               '&:hover': {
                 '& > div': {
@@ -214,7 +215,7 @@ const GridLayoutPreview: React.FC<GridLayoutPreviewProps> = ({ template, selecte
               gridTemplateRows: 'repeat(3, 1fr)',
               gap,
               width: '100%',
-              height: '70px',
+              height: '50px', // Smaller height for sidebar
               cursor: 'pointer',
               '&:hover': {
                 '& > div': {
@@ -262,7 +263,7 @@ const GridLayoutPreview: React.FC<GridLayoutPreviewProps> = ({ template, selecte
               gridTemplateColumns: `repeat(${template.columns}, 1fr)`,
               gap,
               width: '100%',
-              height: '70px',
+              height: '50px', // Smaller height for sidebar
               cursor: 'pointer',
               '&:hover': {
                 '& > div': {
@@ -295,7 +296,7 @@ const GridLayoutPreview: React.FC<GridLayoutPreviewProps> = ({ template, selecte
               gridTemplateColumns: `repeat(1, 1fr)`,
               gap,
               width: '100%',
-              height: '70px',
+              height: '50px', // Smaller height for sidebar
               cursor: 'pointer',
               '&:hover': {
                 '& > div': {
@@ -332,7 +333,7 @@ const GridLayoutPreview: React.FC<GridLayoutPreviewProps> = ({ template, selecte
               gridTemplateRows: template.orientation === 'horizontal' ? '1fr 1fr' : '1fr 1fr',
               gap,
               width: '100%',
-              height: '70px',
+              height: '50px', // Smaller height for sidebar
               cursor: 'pointer',
               '&:hover': {
                 '& > div': {
@@ -373,14 +374,14 @@ const GridLayoutPreview: React.FC<GridLayoutPreviewProps> = ({ template, selecte
     <Paper
       elevation={selected ? 3 : 1}
       sx={{ 
-        p: 1,
+        p: 0.5,
         borderRadius: 1,
         transition: 'all 0.2s',
         border: selected ? `2px solid ${theme.palette.primary.main}` : '2px solid transparent',
-        height: '100%',
+        mb: 1, // Add margin bottom for vertical stacking
       }}
     >
-      <Typography variant="caption" align="center" display="block" sx={{ mb: 1, fontWeight: selected ? 'bold' : 'normal' }}>
+      <Typography variant="caption" align="center" display="block" sx={{ fontSize: '0.7rem', mb: 0.5, fontWeight: selected ? 'bold' : 'normal' }}>
         {template.name}
       </Typography>
       {renderPreview()}
@@ -400,7 +401,8 @@ const GridManager: React.FC<GridManagerProps> = ({ onExport }) => {
   const [specialPage, setSpecialPage] = useState(1);
   const [selectedOrientation, setSelectedOrientation] = useState<string>('all');
   
-  const ITEMS_PER_PAGE = 8;
+  // Reduced items per page for sidebar
+  const ITEMS_PER_PAGE = 6;
   
   // Define grid templates - much more now as requested
   const standardTemplates = [
@@ -515,7 +517,7 @@ const GridManager: React.FC<GridManagerProps> = ({ onExport }) => {
     setSpecialPage(1);
   };
 
-  // Handle clicking on a template to create grid - this function was causing the infinite loop
+  // Handle clicking on a template to create grid
   const handleTemplateClick = (template: GridTemplate) => {
     // Create a deep copy of the template to prevent reference issues
     const templateCopy = JSON.parse(JSON.stringify(template));
@@ -531,201 +533,185 @@ const GridManager: React.FC<GridManagerProps> = ({ onExport }) => {
   };
 
   return (
-    <Box>
-      {/* Filter and action controls */}
-      <Box sx={{ mb: 2 }}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid md={8} sm={8}>
-            <FormControl size="small" fullWidth>
-              <InputLabel>Orientation</InputLabel>
-              <Select
-                value={selectedOrientation}
-                label="Orientation"
-                onChange={handleOrientationChange as any}
-              >
-                <MenuItem value="all">All Layouts</MenuItem>
-                <MenuItem value="portrait">Portrait</MenuItem>
-                <MenuItem value="landscape">Landscape</MenuItem>
-                <MenuItem value="square">Square</MenuItem>
-                <MenuItem value="mixed">Mixed</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid md={4} sm={4}>
-            <Button
-              variant="outlined"
-              color="primary"
-              size="small"
-              startIcon={<AutoAwesomeIcon />}
-              onClick={generateOptimizedGrid}
-              disabled={images.length === 0}
-              fullWidth
-            >
-              Auto Layout
-            </Button>
-          </Grid>
-        </Grid>
-      </Box>
+    <Box sx={{ 
+      display: 'flex', 
+      flexDirection: 'column',
+      height: '100%'
+    }}>
+      <Typography variant="subtitle1" gutterBottom>Layouts</Typography>
+      
+      {/* Filter dropdown */}
+      <FormControl size="small" fullWidth sx={{ mb: 1 }}>
+        <InputLabel>Orientation</InputLabel>
+        <Select
+          value={selectedOrientation}
+          label="Orientation"
+          onChange={handleOrientationChange as any}
+          size="small"
+        >
+          <MenuItem value="all">All</MenuItem>
+          <MenuItem value="portrait">Portrait</MenuItem>
+          <MenuItem value="landscape">Landscape</MenuItem>
+          <MenuItem value="square">Square</MenuItem>
+          <MenuItem value="mixed">Mixed</MenuItem>
+        </Select>
+      </FormControl>
+      
+      {/* Auto Layout Button */}
+      <Button
+        variant="outlined"
+        color="primary"
+        size="small"
+        startIcon={<AutoAwesomeIcon />}
+        onClick={generateOptimizedGrid}
+        disabled={images.length === 0}
+        fullWidth
+        sx={{ mb: 2 }}
+      >
+        Auto Layout
+      </Button>
       
       {/* Layout tabs */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs 
-          value={tabValue} 
-          onChange={handleTabChange} 
-          variant="fullWidth"
-          sx={{ mb: 2 }}
-          aria-label="layout tabs"
-        >
-          <Tab 
-            icon={<GridViewIcon />} 
-            iconPosition="start"
-            label="Standard"
-            id="layout-tab-0"
-            aria-controls="layout-tabpanel-0"
-          />
-          <Tab 
-            icon={<ViewQuiltIcon />} 
-            iconPosition="start"
-            label="Special"
-            id="layout-tab-1"
-            aria-controls="layout-tabpanel-1"
-          />
-        </Tabs>
-      </Box>
-      
-      {/* Standard grid layouts */}
-      <div
-        role="tabpanel"
-        hidden={tabValue !== 0}
-        id="layout-tabpanel-0"
-        aria-labelledby="layout-tab-0"
+      <Tabs 
+        value={tabValue} 
+        onChange={handleTabChange} 
+        variant="fullWidth"
+        size="small"
+        sx={{ mb: 1, minHeight: '36px' }}
+        aria-label="layout tabs"
       >
-        {tabValue === 0 && (
-          <>
-            <Grid container spacing={1}>
+        <Tab 
+          icon={<GridViewIcon fontSize="small" />} 
+          aria-label="Standard layouts"
+          sx={{ minHeight: '36px', p: 0 }}
+        />
+        <Tab 
+          icon={<ViewQuiltIcon fontSize="small" />} 
+          aria-label="Special layouts"
+          sx={{ minHeight: '36px', p: 0 }}
+        />
+      </Tabs>
+      
+      {/* Layout panel - take most of the space and be scrollable */}
+      <Box 
+        sx={{ 
+          flexGrow: 1, 
+          overflowY: 'auto', 
+          p: 1, 
+          border: '1px solid #eee', 
+          borderRadius: 1,
+          mb: 1
+        }}
+      >
+        {/* Standard grid layouts */}
+        <Box
+          role="tabpanel"
+          hidden={tabValue !== 0}
+          id="layout-tabpanel-0"
+          aria-labelledby="layout-tab-0"
+        >
+          {tabValue === 0 && (
+            <>
               {paginatedStandard.map((template, index) => (
-                <Grid md={3} sm={4} xs={6} key={`standard-${index}`}>
-                  <GridLayoutPreview 
-                    template={template}
-                    selected={isActive(template)}
-                    onClick={() => handleTemplateClick(template)}
-                  />
-                </Grid>
-              ))}
-            </Grid>
-            
-            {/* Pagination */}
-            {standardPages > 1 && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                <Pagination 
-                  count={standardPages}
-                  page={standardPage}
-                  onChange={(e, page) => setStandardPage(page)}
-                  size="small"
-                  color="primary"
+                <GridLayoutPreview 
+                  key={`standard-${index}`}
+                  template={template}
+                  selected={isActive(template)}
+                  onClick={() => handleTemplateClick(template)}
                 />
-              </Box>
-            )}
-          </>
-        )}
-      </div>
-      
-      {/* Special grid layouts */}
-      <div
-        role="tabpanel"
-        hidden={tabValue !== 1}
-        id="layout-tabpanel-1"
-        aria-labelledby="layout-tab-1"
-      >
-        {tabValue === 1 && (
-          <>
-            <Grid container spacing={1}>
+              ))}
+              
+              {/* Pagination */}
+              {standardPages > 1 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
+                  <Pagination 
+                    count={standardPages}
+                    page={standardPage}
+                    onChange={(e, page) => setStandardPage(page)}
+                    size="small"
+                    color="primary"
+                  />
+                </Box>
+              )}
+            </>
+          )}
+        </Box>
+        
+        {/* Special grid layouts */}
+        <Box
+          role="tabpanel"
+          hidden={tabValue !== 1}
+          id="layout-tabpanel-1"
+          aria-labelledby="layout-tab-1"
+        >
+          {tabValue === 1 && (
+            <>
               {paginatedSpecial.map((template, index) => (
-                <Grid md={3} sm={4} xs={6} key={`special-${index}`}>
-                  <GridLayoutPreview 
-                    template={template}
-                    selected={isActive(template)}
-                    onClick={() => handleTemplateClick(template)}
-                  />
-                </Grid>
-              ))}
-            </Grid>
-            
-            {/* Pagination */}
-            {specialPages > 1 && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                <Pagination 
-                  count={specialPages}
-                  page={specialPage}
-                  onChange={(e, page) => setSpecialPage(page)}
-                  size="small"
-                  color="primary"
+                <GridLayoutPreview 
+                  key={`special-${index}`}
+                  template={template}
+                  selected={isActive(template)}
+                  onClick={() => handleTemplateClick(template)}
                 />
-              </Box>
-            )}
-          </>
-        )}
-      </div>
-      
-      <Divider sx={{ my: 2 }} />
-      
-      {/* Settings and Actions */}
-      <Box sx={{ mt: 3 }}>
-        <Grid container spacing={3}>
-          {/* Spacing Control */}
-          <Grid md={6} sm={6} xs={12}>
-            <Typography variant="subtitle2" gutterBottom>
-              Spacing: {options?.cellSpacing || 0}px
-            </Typography>
-            <Slider
-              value={options?.cellSpacing || 0}
-              onChange={handleSpacingChange}
-              min={0}
-              max={20}
-              step={1}
-              size="small"
-            />
-          </Grid>
-          
-          {/* Action Buttons */}
-          <Grid md={6} sm={6} xs={12}>
-            <Grid container spacing={1}>
-              <Grid md={6} sm={6} xs={6}>
-                <Button
-                  variant="outlined"
-                  startIcon={<ShuffleIcon />}
-                  onClick={shuffleImages}
-                  disabled={!grid || images.length === 0}
-                  fullWidth
-                >
-                  Shuffle Images
-                </Button>
-              </Grid>
-              <Grid md={6} sm={6} xs={6}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={onExport}
-                  disabled={!grid || images.length === 0}
-                  fullWidth
-                >
-                  Export Collage
-                </Button>
-              </Grid>
-            </Grid>
-          </Grid>
-        </Grid>
+              ))}
+              
+              {/* Pagination */}
+              {specialPages > 1 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
+                  <Pagination 
+                    count={specialPages}
+                    page={specialPage}
+                    onChange={(e, page) => setSpecialPage(page)}
+                    size="small"
+                    color="primary"
+                  />
+                </Box>
+              )}
+            </>
+          )}
+        </Box>
       </Box>
       
-      {/* Instructions */}
-      <Box sx={{ mt: 2 }}>
-        <Typography 
-          variant="body2" 
-          color="text.secondary" 
-          align="center"
-        >
-          Select a layout, then drag images to slots
+      <Divider sx={{ my: 1 }} />
+      
+      {/* Settings and Actions at the bottom */}
+      <Box>
+        {/* Spacing Control */}
+        <Typography variant="caption" gutterBottom>
+          Spacing: {options?.cellSpacing || 0}px
         </Typography>
+        <Slider
+          value={options?.cellSpacing || 0}
+          onChange={handleSpacingChange}
+          min={0}
+          max={20}
+          step={1}
+          size="small"
+          sx={{ mb: 2 }}
+        />
+        
+        {/* Action Buttons */}
+        <Button
+          variant="outlined"
+          startIcon={<ShuffleIcon />}
+          onClick={shuffleImages}
+          disabled={!grid || images.length === 0}
+          fullWidth
+          size="small"
+          sx={{ mb: 1 }}
+        >
+          Shuffle
+        </Button>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={onExport}
+          disabled={!grid || images.length === 0}
+          fullWidth
+          size="small"
+        >
+          Export
+        </Button>
       </Box>
     </Box>
   );
