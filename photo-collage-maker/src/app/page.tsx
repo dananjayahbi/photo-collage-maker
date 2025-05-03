@@ -17,14 +17,20 @@ import CollageCanvas from '../components/CollageCanvas/CollageCanvas';
 
 export default function Home() {
   const [exportedImage, setExportedImage] = useState<string | null>(null);
-  const exportRef = useRef<(() => string | null) | null>(null);
+  const exportRef = useRef<(() => Promise<string | null>) | null>(null);
 
   // Handle exporting the collage
-  const handleExport = () => {
+  const handleExport = async () => {
     if (exportRef.current) {
-      const dataUrl = exportRef.current();
-      if (dataUrl) {
-        setExportedImage(dataUrl);
+      try {
+        // exportRef.current() now returns a Promise, so we need to await it
+        const dataUrl = await exportRef.current();
+        if (dataUrl) {
+          setExportedImage(dataUrl);
+        }
+      } catch (error) {
+        console.error("Error exporting collage:", error);
+        // Optionally show an error message to the user
       }
     }
   };

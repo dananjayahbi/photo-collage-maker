@@ -21,6 +21,7 @@ import {
   DialogActions,
   Fab
 } from '@mui/material';
+import html2canvas from 'html2canvas';
 import { useCollage } from '../Layout/CollageContext';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import ZoomOutIcon from '@mui/icons-material/ZoomOut';
@@ -32,7 +33,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 
 interface CollageCanvasProps {
-  exportRef: React.MutableRefObject<(() => string | null) | null>;
+  exportRef: React.MutableRefObject<(() => Promise<string | null>) | null>;
 }
 
 interface CellControlsState {
@@ -70,18 +71,161 @@ const CollageCanvas: React.FC<CollageCanvasProps> = ({ exportRef }) => {
   // Set up the export reference for the parent component
   useEffect(() => {
     if (exportRef) {
-      exportRef.current = () => {
-        if (!canvasRef.current) return null;
+      exportRef.current = async () => {
+        if (!canvasRef.current || !grid) return null;
         
-        // For actual implementation, you would need html2canvas
-        // import html2canvas from 'html2canvas';
-        // return html2canvas(canvasRef.current).then(canvas => canvas.toDataURL('image/png'));
+        // Create a temporary container for export that will be properly rendered
+        const exportContainer = document.createElement('div');
+        exportContainer.style.position = 'absolute';
+        exportContainer.style.left = '-9999px';
+        exportContainer.style.top = '-9999px';
+        exportContainer.style.width = '1000px'; // Fixed width for consistent output
+        exportContainer.style.backgroundColor = options.backgroundColor || '#ffffff';
+        exportContainer.style.padding = '16px';
+        exportContainer.style.boxSizing = 'border-box';
+        document.body.appendChild(exportContainer);
         
-        alert('To use export functionality, please install html2canvas: npm install html2canvas');
-        return null;
+        // Create grid container with the same styles but without transform scale
+        const gridContainer = document.createElement('div');
+        gridContainer.style.display = 'grid';
+        gridContainer.style.gap = `${options.cellGap || 4}px`;
+        gridContainer.style.width = '100%';
+        gridContainer.style.position = 'relative';
+        
+        // Set specific grid properties based on type (no scaling)
+        switch (grid.type) {
+          case 'standard':
+            gridContainer.style.gridTemplateColumns = `repeat(${grid.columns}, 1fr)`;
+            gridContainer.style.gridTemplateRows = `repeat(${grid.rows}, 1fr)`;
+            gridContainer.style.aspectRatio = `${grid.columns} / ${grid.rows}`;
+            break;
+          
+          case 'masonry':
+            gridContainer.style.gridTemplateColumns = `repeat(${grid.columns}, 1fr)`;
+            gridContainer.style.gridAutoRows = '10px';
+            break;
+          
+          case 'mosaic':
+          case 'featured':
+          case 'split':
+            gridContainer.style.gridTemplateAreas = grid.gridTemplateAreas;
+            gridContainer.style.gridTemplateColumns = grid.gridTemplateColumns;
+            gridContainer.style.gridTemplateRows = grid.gridTemplateRows;
+            gridContainer.style.aspectRatio = '16 / 9';
+            break;
+          
+          case 'horizontal':
+            gridContainer.style.gridTemplateColumns = `repeat(${grid.columns}, 1fr)`;
+            gridContainer.style.gridTemplateRows = '1fr';
+            gridContainer.style.aspectRatio = `${grid.columns} / 1`;
+            break;
+          
+          case 'vertical':
+            gridContainer.style.gridTemplateColumns = '1fr';
+            gridContainer.style.gridTemplateRows = `repeat(${grid.rows}, 1fr)`;
+            gridContainer.style.aspectRatio = `1 / ${grid.rows}`;
+            break;
+        }
+        
+        exportContainer.appendChild(gridContainer);
+        
+        // Create each cell with its image
+        grid.cells.forEach((cell, index) => {
+          const cellImage = cell.imageId ? images.find(img => img.id === cell.imageId) : null;
+          const cellControl = cellControls[cell.id] || initialCellControlState;
+          
+          // Create cell container
+          const cellDiv = document.createElement('div');
+          cellDiv.style.padding = `${options.cellSpacing || 4}px`;
+          cellDiv.style.backgroundColor = options.backgroundColor || '#fff';
+          cellDiv.style.overflow = 'hidden';
+          cellDiv.style.position = 'relative';
+          cellDiv.style.borderRadius = '4px';
+          
+          // Apply grid positioning
+          if (cell.gridArea) cellDiv.style.gridArea = cell.gridArea;
+          if (cell.gridColumn) cellDiv.style.gridColumn = cell.gridColumn;
+          if (cell.gridRow) cellDiv.style.gridRow = cell.gridRow;
+          
+          // For masonry layout
+          if (grid.type === 'masonry') {
+            const cellImage = cell.imageId ? images.find(img => img.id === cell.imageId) : null;
+            const aspectRatio = cellImage?.aspectRatio || 1;
+            const rowSpan = Math.ceil((1 / aspectRatio) * 30);
+            
+            cellDiv.style.gridColumn = `${(index % grid.columns) + 1}`;
+            cellDiv.style.gridRow = `span ${rowSpan}`;
+          }
+          
+          // Create inner content container
+          const innerDiv = document.createElement('div');
+          innerDiv.style.width = '100%';
+          innerDiv.style.height = '100%';
+          innerDiv.style.position = 'relative';
+          innerDiv.style.overflow = 'hidden';
+          innerDiv.style.borderRadius = '2px';
+          innerDiv.style.backgroundColor = cellImage ? 'transparent' : 'rgba(0,0,0,0.05)';
+          innerDiv.style.display = 'flex';
+          innerDiv.style.alignItems = 'center';
+          innerDiv.style.justifyContent = 'center';
+          innerDiv.style.minHeight = '80px';
+          
+          // Add image if exists
+          if (cellImage) {
+            const img = document.createElement('img');
+            img.src = cellImage.dataUrl;
+            img.alt = `Image ${index}`;
+            
+            // Apply image styling from cell controls
+            img.style.width = `${cellControl.zoom}%`;
+            img.style.height = `${cellControl.zoom}%`;
+            img.style.objectFit = cellControl.fit;
+            img.style.objectPosition = `${cellControl.positionX}% ${cellControl.positionY}%`;
+            img.style.position = 'absolute';
+            img.style.top = '50%';
+            img.style.left = '50%';
+            img.style.transform = 'translate(-50%, -50%)';
+            img.style.borderRadius = '2px';
+            img.style.display = 'block';
+            
+            innerDiv.appendChild(img);
+          }
+          
+          cellDiv.appendChild(innerDiv);
+          gridContainer.appendChild(cellDiv);
+        });
+        
+        try {
+          // Use html2canvas with specific options for better rendering
+          const canvas = await html2canvas(gridContainer, {
+            backgroundColor: options.backgroundColor || '#ffffff',
+            logging: false,
+            useCORS: true,
+            allowTaint: true,
+            scale: 2, // Higher quality output
+            imageTimeout: 0,
+            removeContainer: false
+          });
+          
+          const dataUrl = canvas.toDataURL('image/png');
+          
+          // Clean up the temporary elements
+          document.body.removeChild(exportContainer);
+          
+          return dataUrl;
+        } catch (error) {
+          console.error("Error exporting collage:", error);
+          
+          // Clean up even on error
+          if (document.body.contains(exportContainer)) {
+            document.body.removeChild(exportContainer);
+          }
+          
+          return null;
+        }
       };
     }
-  }, [exportRef]);
+  }, [exportRef, grid, images, options, cellControls]);
 
   // Initialize cell controls as cells are created
   useEffect(() => {
