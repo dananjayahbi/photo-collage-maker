@@ -365,6 +365,436 @@ const GridLayoutPreview: React.FC<GridLayoutPreviewProps> = ({ template, selecte
           </Box>
         );
 
+      case 'custom':
+        // Custom layouts based on variant
+        switch(template.variant) {
+          case 'pyramid':
+            return (
+              <Box 
+                sx={{ 
+                  display: 'grid',
+                  gridTemplateAreas: `
+                    "top top top"
+                    "mid-left mid-center mid-right"
+                    "bottom-1 bottom-2 bottom-3"
+                  `,
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gridTemplateRows: 'repeat(3, 1fr)',
+                  gap,
+                  width: '100%',
+                  height: '50px',
+                  cursor: 'pointer',
+                }}
+                onClick={onClick}
+              >
+                <Box sx={{ gridArea: 'top', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'mid-left', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'mid-center', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'mid-right', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'bottom-1', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'bottom-2', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'bottom-3', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+              </Box>
+            );
+          
+          case 'inverted-pyramid':
+            return (
+              <Box 
+                sx={{ 
+                  display: 'grid',
+                  gridTemplateAreas: `
+                    "top-1 top-2 top-3"
+                    "mid-left mid-center mid-right"
+                    "bottom bottom bottom"
+                  `,
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gridTemplateRows: 'repeat(3, 1fr)',
+                  gap,
+                  width: '100%',
+                  height: '50px',
+                  cursor: 'pointer',
+                }}
+                onClick={onClick}
+              >
+                <Box sx={{ gridArea: 'top-1', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'top-2', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'top-3', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'mid-left', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'mid-center', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'mid-right', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'bottom', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+              </Box>
+            );
+
+          case 'pentagon':
+            return (
+              <Box 
+                sx={{ 
+                  display: 'grid',
+                  gridTemplateAreas: `
+                    ". top ."
+                    "mid-left mid-right ."
+                    "bottom-left bottom-center bottom-right"
+                  `,
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gridTemplateRows: 'repeat(3, 1fr)',
+                  gap,
+                  width: '100%',
+                  height: '50px',
+                  cursor: 'pointer',
+                }}
+                onClick={onClick}
+              >
+                <Box sx={{ gridArea: 'top', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'mid-left', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'mid-right', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'bottom-left', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'bottom-center', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'bottom-right', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+              </Box>
+            );
+
+          case 'circle':
+            return (
+              <Box 
+                sx={{ 
+                  display: 'grid',
+                  gridTemplateAreas: `
+                    ". top ."
+                    "left . right"
+                    ". bottom ."
+                  `,
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gridTemplateRows: 'repeat(3, 1fr)',
+                  gap,
+                  width: '100%',
+                  height: '50px',
+                  cursor: 'pointer',
+                }}
+                onClick={onClick}
+              >
+                <Box sx={{ gridArea: 'top', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'left', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'right', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'bottom', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+              </Box>
+            );
+
+          case 'polaroid':
+            return (
+              <Box 
+                sx={{ 
+                  display: 'grid',
+                  gridTemplateAreas: `
+                    "main main main"
+                    "main main main"
+                    "small-1 small-2 small-3"
+                  `,
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gridTemplateRows: '2fr 2fr 1fr',
+                  gap,
+                  width: '100%',
+                  height: '50px',
+                  cursor: 'pointer',
+                }}
+                onClick={onClick}
+              >
+                <Box sx={{ gridArea: 'main', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'small-1', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'small-2', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'small-3', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+              </Box>
+            );
+
+          case 'gallery':
+            return (
+              <Box 
+                sx={{ 
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(4, 1fr)',
+                  gridAutoRows: '10px',
+                  gap,
+                  width: '100%',
+                  height: '50px',
+                  cursor: 'pointer',
+                }}
+                onClick={onClick}
+              >
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <Box 
+                    key={i}
+                    sx={{ 
+                      backgroundColor: selected ? 'primary.main' : 'primary.light',
+                      borderRadius: '2px',
+                      gridRow: `span ${i % 3 + 1}`,
+                    }} 
+                  />
+                ))}
+              </Box>
+            );
+
+          case 'timeline':
+            return (
+              <Box 
+                sx={{ 
+                  display: 'grid',
+                  gridTemplateRows: 'repeat(1, 1fr)',
+                  gridTemplateColumns: 'repeat(5, 1fr)',
+                  gap,
+                  width: '100%',
+                  height: '50px',
+                  cursor: 'pointer',
+                }}
+                onClick={onClick}
+              >
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Box 
+                    key={i}
+                    sx={{ 
+                      backgroundColor: selected ? 'primary.main' : 'primary.light',
+                      borderRadius: '2px',
+                    }} 
+                  />
+                ))}
+              </Box>
+            );
+
+          case 'spiral':
+            return (
+              <Box 
+                sx={{ 
+                  display: 'grid',
+                  gridTemplateAreas: `
+                    "a b c"
+                    "h i d"
+                    "g f e"
+                  `,
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gridTemplateRows: 'repeat(3, 1fr)',
+                  gap,
+                  width: '100%',
+                  height: '50px',
+                  cursor: 'pointer',
+                }}
+                onClick={onClick}
+              >
+                <Box sx={{ gridArea: 'a', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'b', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'c', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'd', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'e', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'f', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'g', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'h', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'i', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+              </Box>
+            );
+
+          case 'T-shape':
+            return (
+              <Box 
+                sx={{ 
+                  display: 'grid',
+                  gridTemplateAreas: `
+                    "top top top"
+                    ". middle ."
+                    ". bottom ."
+                  `,
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gridTemplateRows: 'repeat(3, 1fr)',
+                  gap,
+                  width: '100%',
+                  height: '50px',
+                  cursor: 'pointer',
+                }}
+                onClick={onClick}
+              >
+                <Box sx={{ gridArea: 'top', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'middle', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'bottom', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+              </Box>
+            );
+
+          case 'L-shape':
+            return (
+              <Box 
+                sx={{ 
+                  display: 'grid',
+                  gridTemplateAreas: `
+                    "left . ."
+                    "left . ."
+                    "bottom bottom bottom"
+                  `,
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gridTemplateRows: 'repeat(3, 1fr)',
+                  gap,
+                  width: '100%',
+                  height: '50px',
+                  cursor: 'pointer',
+                }}
+                onClick={onClick}
+              >
+                <Box sx={{ gridArea: 'left', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'bottom', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+              </Box>
+            );
+
+          case 'cross':
+            return (
+              <Box 
+                sx={{ 
+                  display: 'grid',
+                  gridTemplateAreas: `
+                    ". top ."
+                    "left center right"
+                    ". bottom ."
+                  `,
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gridTemplateRows: 'repeat(3, 1fr)',
+                  gap,
+                  width: '100%',
+                  height: '50px',
+                  cursor: 'pointer',
+                }}
+                onClick={onClick}
+              >
+                <Box sx={{ gridArea: 'top', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'left', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'center', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'right', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'bottom', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+              </Box>
+            );
+
+          case 'diagonal':
+            return (
+              <Box 
+                sx={{ 
+                  display: 'grid',
+                  gridTemplateAreas: `
+                    "top . ."
+                    ". middle ."
+                    ". . bottom"
+                  `,
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gridTemplateRows: 'repeat(3, 1fr)',
+                  gap,
+                  width: '100%',
+                  height: '50px',
+                  cursor: 'pointer',
+                }}
+                onClick={onClick}
+              >
+                <Box sx={{ gridArea: 'top', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'middle', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'bottom', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+              </Box>
+            );
+
+          case 'stacked':
+            return (
+              <Box 
+                sx={{ 
+                  display: 'grid',
+                  gridTemplateRows: 'repeat(3, 1fr)',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gap,
+                  width: '100%',
+                  height: '50px',
+                  cursor: 'pointer',
+                }}
+                onClick={onClick}
+              >
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Box 
+                    key={i}
+                    sx={{ 
+                      backgroundColor: selected ? 'primary.main' : 'primary.light',
+                      borderRadius: '2px',
+                      transform: `translateX(${i % 2 === 0 ? '-2px' : '2px'})`,
+                    }} 
+                  />
+                ))}
+              </Box>
+            );
+
+          case '2+3':
+            return (
+              <Box 
+                sx={{ 
+                  display: 'grid',
+                  gridTemplateAreas: `
+                    "top-left top-right"
+                    "bottom bottom"
+                    "bottom bottom"
+                  `,
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gridTemplateRows: '1fr 2fr',
+                  gap,
+                  width: '100%',
+                  height: '50px',
+                  cursor: 'pointer',
+                }}
+                onClick={onClick}
+              >
+                <Box sx={{ gridArea: 'top-left', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'top-right', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'bottom', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+              </Box>
+            );
+
+          case '3+2':
+            return (
+              <Box 
+                sx={{ 
+                  display: 'grid',
+                  gridTemplateAreas: `
+                    "top top"
+                    "top top"
+                    "bottom-left bottom-right"
+                  `,
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gridTemplateRows: '2fr 1fr',
+                  gap,
+                  width: '100%',
+                  height: '50px',
+                  cursor: 'pointer',
+                }}
+                onClick={onClick}
+              >
+                <Box sx={{ gridArea: 'top', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'bottom-left', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+                <Box sx={{ gridArea: 'bottom-right', backgroundColor: selected ? 'primary.main' : 'primary.light', borderRadius: '2px' }} />
+              </Box>
+            );
+
+          default:
+            return (
+              <Box 
+                sx={{ 
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gridTemplateRows: 'repeat(3, 1fr)',
+                  gap,
+                  width: '100%',
+                  height: '50px',
+                  cursor: 'pointer',
+                }}
+                onClick={onClick}
+              >
+                {Array.from({ length: 9 }).map((_, i) => (
+                  <Box 
+                    key={i}
+                    sx={{ 
+                      backgroundColor: selected ? 'primary.main' : 'primary.light',
+                      borderRadius: '2px',
+                    }} 
+                  />
+                ))}
+              </Box>
+            );
+        }
+
       default:
         return null;
     }

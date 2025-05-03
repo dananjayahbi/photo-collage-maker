@@ -473,6 +473,37 @@ const CollageCanvas: React.FC<CollageCanvasProps> = ({ exportRef }) => {
           aspectRatio: 16 / 9,
         };
       
+      case 'custom':
+        // Handle custom layouts - they use grid template areas in most cases
+        if (grid.gridTemplateAreas) {
+          return {
+            ...baseStyle,
+            gridTemplateAreas: grid.gridTemplateAreas,
+            gridTemplateColumns: grid.gridTemplateColumns || 'repeat(3, 1fr)',
+            gridTemplateRows: grid.gridTemplateRows || 'repeat(3, 1fr)',
+            aspectRatio: grid.variant === 'timeline' ? 5 / 1 : 16 / 9,
+          };
+        }
+        
+        // For custom layouts that use standard grid (like stacked)
+        if (grid.rows && grid.columns) {
+          return {
+            ...baseStyle,
+            gridTemplateColumns: `repeat(${grid.columns}, 1fr)`,
+            gridTemplateRows: `repeat(${grid.rows}, 1fr)`,
+            aspectRatio: grid.columns / grid.rows,
+          };
+        }
+        
+        // For gallery-like layouts that need auto rows
+        if (grid.variant === 'gallery') {
+          return {
+            ...baseStyle,
+            gridTemplateColumns: grid.gridTemplateColumns || 'repeat(4, 1fr)',
+            gridAutoRows: grid.gridAutoRows || '100px',
+          };
+        }
+      
       default:
         return baseStyle;
     }
