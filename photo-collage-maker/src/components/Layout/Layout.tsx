@@ -36,7 +36,7 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
             component={Paper} 
             elevation={3} 
             sx={{ 
-              width: { xs: '80px', sm: '220px' },
+              width: { xs: '80px', sm: '350px' },
               p: 2,
               m: 1,
               flexShrink: 0,
