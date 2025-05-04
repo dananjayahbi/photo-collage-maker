@@ -92,17 +92,20 @@ const CollageCanvas: React.FC<CollageCanvasProps> = ({ exportRef }) => {
         gridContainer.style.width = '100%';
         gridContainer.style.position = 'relative';
         
+        // Get the row height multiplier from options
+        const rowHeight = options.rowHeight || 1;
+        
         // Set specific grid properties based on type (no scaling)
         switch (grid.type) {
           case 'standard':
             gridContainer.style.gridTemplateColumns = `repeat(${grid.columns}, 1fr)`;
-            gridContainer.style.gridTemplateRows = `repeat(${grid.rows}, 1fr)`;
-            gridContainer.style.aspectRatio = `${grid.columns} / ${grid.rows}`;
+            gridContainer.style.gridTemplateRows = `repeat(${grid.rows}, ${rowHeight}fr)`;
+            gridContainer.style.aspectRatio = `${grid.columns} / ${grid.rows * rowHeight}`;
             break;
           
           case 'masonry':
             gridContainer.style.gridTemplateColumns = `repeat(${grid.columns}, 1fr)`;
-            gridContainer.style.gridAutoRows = '10px';
+            gridContainer.style.gridAutoRows = `${10 * rowHeight}px`;
             break;
           
           case 'mosaic':
@@ -110,20 +113,69 @@ const CollageCanvas: React.FC<CollageCanvasProps> = ({ exportRef }) => {
           case 'split':
             gridContainer.style.gridTemplateAreas = grid.gridTemplateAreas;
             gridContainer.style.gridTemplateColumns = grid.gridTemplateColumns;
-            gridContainer.style.gridTemplateRows = grid.gridTemplateRows;
-            gridContainer.style.aspectRatio = '16 / 9';
+            if (grid.gridTemplateRows) {
+              // Apply rowHeight to existing template rows
+              gridContainer.style.gridTemplateRows = grid.gridTemplateRows.replace(
+                /1fr/g, 
+                `${rowHeight}fr`
+              );
+            } else {
+              gridContainer.style.gridTemplateRows = `repeat(3, ${rowHeight}fr)`;
+            }
+            gridContainer.style.aspectRatio = `16 / ${9 * rowHeight}`;
             break;
           
           case 'horizontal':
             gridContainer.style.gridTemplateColumns = `repeat(${grid.columns}, 1fr)`;
-            gridContainer.style.gridTemplateRows = '1fr';
-            gridContainer.style.aspectRatio = `${grid.columns} / 1`;
+            gridContainer.style.gridTemplateRows = `${rowHeight}fr`;
+            gridContainer.style.aspectRatio = `${grid.columns} / ${rowHeight}`;
             break;
           
           case 'vertical':
             gridContainer.style.gridTemplateColumns = '1fr';
-            gridContainer.style.gridTemplateRows = `repeat(${grid.rows}, 1fr)`;
-            gridContainer.style.aspectRatio = `1 / ${grid.rows}`;
+            gridContainer.style.gridTemplateRows = `repeat(${grid.rows}, ${rowHeight}fr)`;
+            gridContainer.style.aspectRatio = `1 / ${grid.rows * rowHeight}`;
+            break;
+            
+          case 'custom':
+            // Handle custom layouts with gridTemplateAreas
+            if (grid.gridTemplateAreas) {
+              gridContainer.style.gridTemplateAreas = grid.gridTemplateAreas;
+              gridContainer.style.gridTemplateColumns = grid.gridTemplateColumns || 'repeat(3, 1fr)';
+              if (grid.gridTemplateRows) {
+                // Apply rowHeight to existing template rows
+                gridContainer.style.gridTemplateRows = grid.gridTemplateRows.replace(
+                  /1fr/g, 
+                  `${rowHeight}fr`
+                );
+              } else {
+                gridContainer.style.gridTemplateRows = `repeat(3, ${rowHeight}fr)`;
+              }
+              // Adjust aspect ratio for different variants
+              if (grid.variant === 'timeline') {
+                gridContainer.style.aspectRatio = `5 / ${rowHeight}`;
+              } else {
+                gridContainer.style.aspectRatio = `16 / ${9 * rowHeight}`;
+              }
+            }
+            // For custom layouts that use standard grid
+            else if (grid.rows && grid.columns) {
+              gridContainer.style.gridTemplateColumns = `repeat(${grid.columns}, 1fr)`;
+              gridContainer.style.gridTemplateRows = `repeat(${grid.rows}, ${rowHeight}fr)`;
+              gridContainer.style.aspectRatio = `${grid.columns} / ${grid.rows * rowHeight}`;
+            }
+            // For gallery-like layouts that need auto rows
+            else if (grid.variant === 'gallery') {
+              gridContainer.style.gridTemplateColumns = grid.gridTemplateColumns || 'repeat(4, 1fr)';
+              if (grid.gridAutoRows) {
+                gridContainer.style.gridAutoRows = grid.gridAutoRows.replace(
+                  /\d+px/, 
+                  (match) => `${parseInt(match) * rowHeight}px`
+                );
+              } else {
+                gridContainer.style.gridAutoRows = `${100 * rowHeight}px`;
+              }
+            }
             break;
         }
         
@@ -416,8 +468,10 @@ const CollageCanvas: React.FC<CollageCanvasProps> = ({ exportRef }) => {
         return {
           ...baseStyle,
           gridTemplateColumns: `repeat(${grid.columns}, 1fr)`,
-          gridTemplateRows: `repeat(${grid.rows}, 1fr)`,
-          aspectRatio: grid.columns / grid.rows,
+          // Apply rowHeight multiplier to the grid template rows
+          gridTemplateRows: `repeat(${grid.rows}, ${options.rowHeight}fr)`,
+          // Adjust aspect ratio using the rowHeight 
+          aspectRatio: grid.columns / (grid.rows * options.rowHeight),
         };
       
       case 'masonry':
@@ -425,7 +479,7 @@ const CollageCanvas: React.FC<CollageCanvasProps> = ({ exportRef }) => {
         return {
           ...baseStyle,
           gridTemplateColumns: `repeat(${grid.columns}, 1fr)`,
-          gridAutoRows: '10px', // Small row height for precise item placement
+          gridAutoRows: `${10 * options.rowHeight}px`, // Adjust auto row height with rowHeight
         };
       
       case 'mosaic':
@@ -434,8 +488,10 @@ const CollageCanvas: React.FC<CollageCanvasProps> = ({ exportRef }) => {
           ...baseStyle,
           gridTemplateAreas: grid.gridTemplateAreas,
           gridTemplateColumns: grid.gridTemplateColumns,
-          gridTemplateRows: grid.gridTemplateRows,
-          aspectRatio: 16 / 9,
+          // Apply rowHeight to the template rows if present
+          gridTemplateRows: grid.gridTemplateRows?.replace(/1fr/g, `${options.rowHeight}fr`) || 
+                           `repeat(3, ${options.rowHeight}fr)`,
+          aspectRatio: 16 / (9 * options.rowHeight),
         };
       
       case 'featured':
@@ -444,24 +500,27 @@ const CollageCanvas: React.FC<CollageCanvasProps> = ({ exportRef }) => {
           ...baseStyle,
           gridTemplateAreas: grid.gridTemplateAreas,
           gridTemplateColumns: grid.gridTemplateColumns,
-          gridTemplateRows: grid.gridTemplateRows,
-          aspectRatio: 16 / 9,
+          // Apply rowHeight to the template rows if present
+          gridTemplateRows: grid.gridTemplateRows?.replace(/1fr/g, `${options.rowHeight}fr`) || 
+                           `repeat(3, ${options.rowHeight}fr)`,
+          aspectRatio: 16 / (9 * options.rowHeight),
         };
       
       case 'horizontal':
         return {
           ...baseStyle,
           gridTemplateColumns: `repeat(${grid.columns}, 1fr)`,
-          gridTemplateRows: '1fr',
-          aspectRatio: grid.columns,
+          gridTemplateRows: `${options.rowHeight}fr`, // Apply rowHeight
+          aspectRatio: grid.columns / options.rowHeight,
         };
       
       case 'vertical':
         return {
           ...baseStyle,
           gridTemplateColumns: '1fr',
-          gridTemplateRows: `repeat(${grid.rows}, 1fr)`,
-          aspectRatio: 1 / grid.rows,
+          // Apply rowHeight to each row
+          gridTemplateRows: `repeat(${grid.rows}, ${options.rowHeight}fr)`,
+          aspectRatio: 1 / (grid.rows * options.rowHeight),
         };
       
       case 'split':
@@ -469,8 +528,10 @@ const CollageCanvas: React.FC<CollageCanvasProps> = ({ exportRef }) => {
           ...baseStyle,
           gridTemplateAreas: grid.gridTemplateAreas,
           gridTemplateColumns: grid.gridTemplateColumns,
-          gridTemplateRows: grid.gridTemplateRows,
-          aspectRatio: 16 / 9,
+          // Apply rowHeight to the template rows if present
+          gridTemplateRows: grid.gridTemplateRows?.replace(/1fr/g, `${options.rowHeight}fr`) || 
+                           `repeat(2, ${options.rowHeight}fr)`,
+          aspectRatio: 16 / (9 * options.rowHeight),
         };
       
       case 'custom':
@@ -480,8 +541,10 @@ const CollageCanvas: React.FC<CollageCanvasProps> = ({ exportRef }) => {
             ...baseStyle,
             gridTemplateAreas: grid.gridTemplateAreas,
             gridTemplateColumns: grid.gridTemplateColumns || 'repeat(3, 1fr)',
-            gridTemplateRows: grid.gridTemplateRows || 'repeat(3, 1fr)',
-            aspectRatio: grid.variant === 'timeline' ? 5 / 1 : 16 / 9,
+            // Apply rowHeight to the template rows if present
+            gridTemplateRows: grid.gridTemplateRows?.replace(/1fr/g, `${options.rowHeight}fr`) || 
+                             `repeat(3, ${options.rowHeight}fr)`,
+            aspectRatio: grid.variant === 'timeline' ? 5 / options.rowHeight : 16 / (9 * options.rowHeight),
           };
         }
         
@@ -490,8 +553,9 @@ const CollageCanvas: React.FC<CollageCanvasProps> = ({ exportRef }) => {
           return {
             ...baseStyle,
             gridTemplateColumns: `repeat(${grid.columns}, 1fr)`,
-            gridTemplateRows: `repeat(${grid.rows}, 1fr)`,
-            aspectRatio: grid.columns / grid.rows,
+            // Apply rowHeight to each row
+            gridTemplateRows: `repeat(${grid.rows}, ${options.rowHeight}fr)`,
+            aspectRatio: grid.columns / (grid.rows * options.rowHeight),
           };
         }
         
@@ -500,7 +564,9 @@ const CollageCanvas: React.FC<CollageCanvasProps> = ({ exportRef }) => {
           return {
             ...baseStyle,
             gridTemplateColumns: grid.gridTemplateColumns || 'repeat(4, 1fr)',
-            gridAutoRows: grid.gridAutoRows || '100px',
+            gridAutoRows: grid.gridAutoRows ? 
+              grid.gridAutoRows.replace(/\d+px/, (match) => `${parseInt(match) * options.rowHeight}px`) : 
+              `${100 * options.rowHeight}px`,
           };
         }
       

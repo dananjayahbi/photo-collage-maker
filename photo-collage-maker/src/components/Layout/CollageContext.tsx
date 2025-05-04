@@ -29,6 +29,7 @@ const defaultOptions: CollageOptions = {
   cellBorderWidth: 0,
   cellBorderColor: '#000000',
   padding: 16,
+  rowHeight: 1, // Default row height multiplier (1 = standard height)
 };
 
 const defaultCellStyle: CellStyle = {

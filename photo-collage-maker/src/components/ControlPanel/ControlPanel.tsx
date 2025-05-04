@@ -21,8 +21,8 @@ import {
   ColorLensRounded,
 } from '@mui/icons-material';
 import { useCollage } from '../Layout/CollageContext';
-import { ImageFit } from '../../types';
 import ColorizeIcon from '@mui/icons-material/Colorize';
+import RowHeightSlider from './RowHeightSlider';
 
 // Color picker component
 const ColorPicker: React.FC<{
@@ -177,9 +177,12 @@ interface ControlPanelProps {
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({ onExport }) => {
-  const { options, updateOptions, shuffleImages, generateGrid, grid, images } = useCollage();
+  const { options, updateOptions, shuffleImages, grid, images, generateGrid } = useCollage();
   const [columns, setColumns] = useState<number>(4);
   const [rows, setRows] = useState<number>(3);
+  
+  // Create local reference to rowHeight for the slider
+  const [rowHeightValue, setRowHeightValue] = useState<number>(options.rowHeight);
 
   const handleColumnsChange = (_: Event, value: number | number[]) => {
     setColumns(value as number);
@@ -189,35 +192,27 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onExport }) => {
     setRows(value as number);
   };
 
+  const handleGenerateGrid = () => {
+    generateGrid({ 
+      name: `${rows} × ${columns}`, 
+      type: 'standard', 
+      rows, 
+      columns 
+    });
+  };
+
   const handleSpacingChange = (_: Event, value: number | number[]) => {
     updateOptions({ cellSpacing: value as number });
   };
 
+  const handleRowHeightChange = (_: Event, value: number | number[]) => {
+    const newHeight = value as number;
+    setRowHeightValue(newHeight);
+    updateOptions({ rowHeight: newHeight });
+  };
+
   const handleBackgroundColorChange = (color: string) => {
     updateOptions({ backgroundColor: color });
-  };
-
-  const handleImageFitChange = (e: React.ChangeEvent<{ value: unknown }>) => {
-    updateOptions({ imageFit: e.target.value as ImageFit });
-  };
-
-  // Common colors for quick selection
-  const commonColors = [
-    '#FFFFFF', // White
-    '#000000', // Black
-    '#F5F5F5', // Light Gray
-    '#E0E0E0', // Gray
-    '#1976D2', // Blue
-    '#2E7D32', // Green
-    '#D32F2F', // Red
-    '#FFC107', // Amber
-    '#9C27B0', // Purple
-    '#FF9800'  // Orange
-  ];
-
-  // Handle color change
-  const handleColorChange = (color: string) => {
-    updateOptions({ ...options, backgroundColor: color });
   };
 
   return (
@@ -266,7 +261,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onExport }) => {
             <Button
               variant="outlined"
               startIcon={<GridViewRounded />}
-              onClick={generateGrid}
+              onClick={handleGenerateGrid}
               disabled={!grid}
               fullWidth
             >
@@ -288,7 +283,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onExport }) => {
                 Spacing: {options.cellSpacing}px
               </Typography>
               <Slider
-                value={options.cellSpacing}
+                value={options.cellSpacing || 0}
                 onChange={handleSpacingChange}
                 min={0}
                 max={20}
@@ -296,6 +291,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onExport }) => {
                 size="small"
               />
             </Box>
+
+            <RowHeightSlider />
 
             <Box>
               <Typography variant="body2" gutterBottom>
@@ -306,20 +303,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onExport }) => {
                 onChange={handleBackgroundColorChange}
               />
             </Box>
-
-            <FormControl size="small" fullWidth>
-              <InputLabel id="image-fit-label">Image Fit</InputLabel>
-              <Select
-                labelId="image-fit-label"
-                value={options.imageFit}
-                onChange={handleImageFitChange}
-                label="Image Fit"
-              >
-                <MenuItem value="fill">Fill</MenuItem>
-                <MenuItem value="contain">Contain</MenuItem>
-                <MenuItem value="cover">Cover</MenuItem>
-              </Select>
-            </FormControl>
           </Stack>
         </Box>
 
