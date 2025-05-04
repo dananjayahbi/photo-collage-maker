@@ -29,6 +29,7 @@ const defaultOptions: CollageOptions = {
   cellBorderWidth: 0,
   cellBorderColor: '#000000',
   padding: 16,
+  rowHeight: 1, // Default row height multiplier (1 = standard height)
 };
 
 const defaultCellStyle: CellStyle = {
@@ -366,7 +367,7 @@ export const CollageProvider = ({ children }: { children: ReactNode }) => {
           `"top top"
            "bottom-left bottom-right"` :
           `"left top-right"
-           "left bottom-right"`;
+           "left bottom-right"}`;
         
         const areas = isHorizontal ? 
           ['top', 'bottom-left', 'bottom-right'] : 
@@ -388,6 +389,470 @@ export const CollageProvider = ({ children }: { children: ReactNode }) => {
           gridTemplateRows: isHorizontal ? '1fr 1fr' : '1fr 1fr',
           cells,
         };
+        break;
+      }
+      
+      // Custom layouts
+      case 'custom': {
+        switch(template.variant) {
+          case 'pyramid': {
+            // Pyramid shape (1 top, 3 middle, 3 bottom)
+            const gridAreas = `
+              "top top top"
+              "mid-left mid-center mid-right"
+              "bottom-1 bottom-2 bottom-3"
+            `;
+            
+            const areas = ['top', 'mid-left', 'mid-center', 'mid-right', 'bottom-1', 'bottom-2', 'bottom-3'];
+            
+            areas.forEach(area => {
+              cells.push({
+                id: uuidv4(),
+                gridArea: area,
+                style: { ...defaultCellStyle },
+              });
+            });
+            
+            newGrid = {
+              type: 'custom',
+              variant: 'pyramid',
+              gridTemplateAreas: gridAreas.trim(),
+              gridTemplateColumns: '1fr 1fr 1fr',
+              gridTemplateRows: '1fr 1fr 1fr',
+              cells,
+            };
+            break;
+          }
+          
+          case 'inverted-pyramid': {
+            // Inverted pyramid (3 top, 3 middle, 1 bottom)
+            const gridAreas = `
+              "top-1 top-2 top-3"
+              "mid-left mid-center mid-right"
+              "bottom bottom bottom"
+            `;
+            
+            const areas = ['top-1', 'top-2', 'top-3', 'mid-left', 'mid-center', 'mid-right', 'bottom'];
+            
+            areas.forEach(area => {
+              cells.push({
+                id: uuidv4(),
+                gridArea: area,
+                style: { ...defaultCellStyle },
+              });
+            });
+            
+            newGrid = {
+              type: 'custom',
+              variant: 'inverted-pyramid',
+              gridTemplateAreas: gridAreas.trim(),
+              gridTemplateColumns: '1fr 1fr 1fr',
+              gridTemplateRows: '1fr 1fr 1fr',
+              cells,
+            };
+            break;
+          }
+          
+          case 'pentagon': {
+            // Pentagon shape (1 top, 2 middle, 3 bottom)
+            const gridAreas = `
+              ". top ."
+              "mid-left mid-right ."
+              "bottom-left bottom-center bottom-right"
+            `;
+            
+            const areas = ['top', 'mid-left', 'mid-right', 'bottom-left', 'bottom-center', 'bottom-right'];
+            
+            areas.forEach(area => {
+              cells.push({
+                id: uuidv4(),
+                gridArea: area,
+                style: { ...defaultCellStyle },
+              });
+            });
+            
+            newGrid = {
+              type: 'custom',
+              variant: 'pentagon',
+              gridTemplateAreas: gridAreas.trim(),
+              gridTemplateColumns: '1fr 1fr 1fr',
+              gridTemplateRows: '1fr 1fr 1fr',
+              cells,
+            };
+            break;
+          }
+          
+          case 'circle': {
+            // Circle gallery (4 images in a circle)
+            const gridAreas = `
+              ". top ."
+              "left . right"
+              ". bottom ."
+            `;
+            
+            const areas = ['top', 'left', 'right', 'bottom'];
+            
+            areas.forEach(area => {
+              cells.push({
+                id: uuidv4(),
+                gridArea: area,
+                style: { ...defaultCellStyle },
+              });
+            });
+            
+            newGrid = {
+              type: 'custom',
+              variant: 'circle',
+              gridTemplateAreas: gridAreas.trim(),
+              gridTemplateColumns: '1fr 1fr 1fr',
+              gridTemplateRows: '1fr 1fr 1fr',
+              cells,
+            };
+            break;
+          }
+          
+          case 'polaroid': {
+            // Polaroid stack (1 large on top, 3 small on bottom)
+            const gridAreas = `
+              "main main main"
+              "main main main"
+              "small-1 small-2 small-3"
+            `;
+            
+            const areas = ['main', 'small-1', 'small-2', 'small-3'];
+            
+            areas.forEach(area => {
+              cells.push({
+                id: uuidv4(),
+                gridArea: area,
+                style: { ...defaultCellStyle },
+              });
+            });
+            
+            newGrid = {
+              type: 'custom',
+              variant: 'polaroid',
+              gridTemplateAreas: gridAreas.trim(),
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gridTemplateRows: '2fr 2fr 1fr',
+              cells,
+            };
+            break;
+          }
+          
+          case 'gallery': {
+            // Gallery wall (masonry-like, but with variable heights)
+            const columns = 4;
+            const cellCount = Math.max(columns * 2, images.length || 8);
+            
+            for (let i = 0; i < cellCount; i++) {
+              const rowSpan = (i % 3) + 1; // Vary the height (1, 2, or 3 rows)
+              cells.push({
+                id: uuidv4(),
+                gridColumn: `${(i % columns) + 1}`,
+                gridRow: `span ${rowSpan}`,
+                style: { ...defaultCellStyle },
+              });
+            }
+            
+            newGrid = {
+              type: 'custom',
+              variant: 'gallery',
+              gridTemplateColumns: `repeat(${columns}, 1fr)`,
+              gridAutoRows: '100px', // Auto row height
+              cells,
+            };
+            break;
+          }
+          
+          case 'timeline': {
+            // Timeline (horizontal row of equal-sized images)
+            const columns = 5;
+            
+            for (let i = 0; i < columns; i++) {
+              cells.push({
+                id: uuidv4(),
+                columnStart: i + 1,
+                columnEnd: i + 2,
+                rowStart: 1,
+                rowEnd: 2,
+                style: { ...defaultCellStyle },
+              });
+            }
+            
+            newGrid = {
+              type: 'custom',
+              variant: 'timeline',
+              gridTemplateRows: '1fr',
+              gridTemplateColumns: `repeat(${columns}, 1fr)`,
+              cells,
+            };
+            break;
+          }
+          
+          case 'spiral': {
+            // Spiral arrangement (9 cells in a spiral pattern)
+            const gridAreas = `
+              "a b c"
+              "h i d"
+              "g f e"
+            `;
+            
+            const areas = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'];
+            
+            areas.forEach(area => {
+              cells.push({
+                id: uuidv4(),
+                gridArea: area,
+                style: { ...defaultCellStyle },
+              });
+            });
+            
+            newGrid = {
+              type: 'custom',
+              variant: 'spiral',
+              gridTemplateAreas: gridAreas.trim(),
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gridTemplateRows: 'repeat(3, 1fr)',
+              cells,
+            };
+            break;
+          }
+
+          case 'T-shape': {
+            // T-shaped layout
+            const gridAreas = `
+              "top top top"
+              ". middle ."
+              ". bottom ."
+            `;
+            
+            const areas = ['top', 'middle', 'bottom'];
+            
+            areas.forEach(area => {
+              cells.push({
+                id: uuidv4(),
+                gridArea: area,
+                style: { ...defaultCellStyle },
+              });
+            });
+            
+            newGrid = {
+              type: 'custom',
+              variant: 'T-shape',
+              gridTemplateAreas: gridAreas.trim(),
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gridTemplateRows: 'repeat(3, 1fr)',
+              cells,
+            };
+            break;
+          }
+
+          case 'L-shape': {
+            // L-shaped layout
+            const gridAreas = `
+              "left . ."
+              "left . ."
+              "bottom bottom bottom"
+            `;
+            
+            const areas = ['left', 'bottom'];
+            
+            areas.forEach(area => {
+              cells.push({
+                id: uuidv4(),
+                gridArea: area,
+                style: { ...defaultCellStyle },
+              });
+            });
+            
+            newGrid = {
+              type: 'custom',
+              variant: 'L-shape',
+              gridTemplateAreas: gridAreas.trim(),
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gridTemplateRows: 'repeat(3, 1fr)',
+              cells,
+            };
+            break;
+          }
+
+          case 'cross': {
+            // Cross-shaped layout
+            const gridAreas = `
+              ". top ."
+              "left center right"
+              ". bottom ."
+            `;
+            
+            const areas = ['top', 'left', 'center', 'right', 'bottom'];
+            
+            areas.forEach(area => {
+              cells.push({
+                id: uuidv4(),
+                gridArea: area,
+                style: { ...defaultCellStyle },
+              });
+            });
+            
+            newGrid = {
+              type: 'custom',
+              variant: 'cross',
+              gridTemplateAreas: gridAreas.trim(),
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gridTemplateRows: 'repeat(3, 1fr)',
+              cells,
+            };
+            break;
+          }
+
+          case 'diagonal': {
+            // Diagonal layout
+            const gridAreas = `
+              "top . ."
+              ". middle ."
+              ". . bottom"
+            `;
+            
+            const areas = ['top', 'middle', 'bottom'];
+            
+            areas.forEach(area => {
+              cells.push({
+                id: uuidv4(),
+                gridArea: area,
+                style: { ...defaultCellStyle },
+              });
+            });
+            
+            newGrid = {
+              type: 'custom',
+              variant: 'diagonal',
+              gridTemplateAreas: gridAreas.trim(),
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gridTemplateRows: 'repeat(3, 1fr)',
+              cells,
+            };
+            break;
+          }
+
+          case 'stacked': {
+            // Stacked layout (6 cells slightly offset)
+            const rows = 3;
+            const columns = 2;
+            
+            for (let row = 1; row <= rows; row++) {
+              for (let col = 1; col <= columns; col++) {
+                cells.push({
+                  id: uuidv4(),
+                  rowStart: row,
+                  rowEnd: row + 1,
+                  columnStart: col,
+                  columnEnd: col + 1,
+                  style: { 
+                    ...defaultCellStyle,
+                    position: { 
+                      x: col % 2 === 0 ? 5 : -5, 
+                      y: 0 
+                    }
+                  },
+                });
+              }
+            }
+            
+            newGrid = {
+              type: 'custom',
+              variant: 'stacked',
+              rows,
+              columns,
+              cells,
+            };
+            break;
+          }
+
+          case '2+3': {
+            // 2 images on top, 1 large on bottom
+            const gridAreas = `
+              "top-left top-right"
+              "bottom bottom"
+              "bottom bottom"
+            `;
+            
+            const areas = ['top-left', 'top-right', 'bottom'];
+            
+            areas.forEach(area => {
+              cells.push({
+                id: uuidv4(),
+                gridArea: area,
+                style: { ...defaultCellStyle },
+              });
+            });
+            
+            newGrid = {
+              type: 'custom',
+              variant: '2+3',
+              gridTemplateAreas: gridAreas.trim(),
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gridTemplateRows: '1fr 2fr',
+              cells,
+            };
+            break;
+          }
+
+          case '3+2': {
+            // 1 large on top, 2 on bottom
+            const gridAreas = `
+              "top top"
+              "top top"
+              "bottom-left bottom-right"
+            `;
+            
+            const areas = ['top', 'bottom-left', 'bottom-right'];
+            
+            areas.forEach(area => {
+              cells.push({
+                id: uuidv4(),
+                gridArea: area,
+                style: { ...defaultCellStyle },
+              });
+            });
+            
+            newGrid = {
+              type: 'custom',
+              variant: '3+2',
+              gridTemplateAreas: gridAreas.trim(),
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gridTemplateRows: '2fr 1fr',
+              cells,
+            };
+            break;
+          }
+
+          default: {
+            // Fallback to standard grid if variant not recognized
+            const rows = 2;
+            const columns = 2;
+            
+            for (let row = 1; row <= rows; row++) {
+              for (let col = 1; col <= columns; col++) {
+                cells.push({
+                  id: uuidv4(),
+                  rowStart: row,
+                  rowEnd: row + 1,
+                  columnStart: col,
+                  columnEnd: col + 1,
+                  style: { ...defaultCellStyle },
+                });
+              }
+            }
+            
+            newGrid = {
+              type: 'standard',
+              rows,
+              columns,
+              cells,
+            };
+          }
+        }
         break;
       }
       

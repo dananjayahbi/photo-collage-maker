@@ -53,6 +53,8 @@ export interface CollageOptions {
   cellBorderWidth: number;
   cellBorderColor: string;
   padding: number;
+  rowHeight: number; // Added to control the height of rows in grid layouts
+  imageFit?: 'cover' | 'contain' | 'fill'; // Default image fit style for cells
 }
 
 export interface DragItem {
